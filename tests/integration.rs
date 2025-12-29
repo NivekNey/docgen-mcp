@@ -1,5 +1,5 @@
 use tokio::process::Command;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 /// Test that the stdio server starts and runs without crashing
 #[tokio::test]
@@ -76,14 +76,11 @@ async fn test_http_server_starts() {
         .expect("Failed to start HTTP server");
 
     // Give server time to start
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
     // Try to connect to the server
     let client = reqwest::Client::new();
-    let response = client
-        .get("http://localhost:3001/mcp")
-        .send()
-        .await;
+    let response = client.get("http://localhost:3001/mcp").send().await;
 
     // The endpoint should be accessible (even if it returns an error about missing headers)
     assert!(response.is_ok(), "HTTP server should be reachable");

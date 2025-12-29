@@ -3,8 +3,8 @@
 //! This module provides functions for MCP resource discovery and retrieval.
 //! Resources expose JSON schemas generated from Rust types.
 
-use rmcp::model::{AnnotateAble, RawResource, Resource, ResourceContents};
 use crate::documents::Resume;
+use rmcp::model::{AnnotateAble, RawResource, Resource, ResourceContents};
 
 /// URI for the resume schema resource
 pub const RESUME_SCHEMA_URI: &str = "docgen://schemas/resume";
@@ -23,8 +23,8 @@ pub fn read_resource(uri: &str) -> Option<ResourceContents> {
     match uri {
         RESUME_SCHEMA_URI => {
             let schema = schemars::schema_for!(Resume);
-            let schema_json = serde_json::to_string_pretty(&schema)
-                .expect("Failed to serialize schema");
+            let schema_json =
+                serde_json::to_string_pretty(&schema).expect("Failed to serialize schema");
 
             Some(ResourceContents::TextResourceContents {
                 uri: uri.to_string(),

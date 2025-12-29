@@ -3,16 +3,23 @@
 //! This module provides MCP tools for validating and generating documents.
 //! Currently implements:
 //! - `validate_resume` - Validates JSON payload against resume schema
+//! - `generate_resume` - Generates a PDF from a resume JSON payload
 
+use base64::{Engine as _, engine::general_purpose};
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 
 use crate::documents::Resume;
+use crate::typst::compiler::compile;
+use crate::typst::transform::transform_resume;
 
 /// Tool name for resume validation
 pub const VALIDATE_RESUME_TOOL: &str = "validate_resume";
+
+/// Tool name for resume generation
+pub const GENERATE_RESUME_TOOL: &str = "generate_resume";
 
 /// Result of a validation operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +36,27 @@ pub enum ValidationResult {
     Invalid {
         /// List of validation errors
         errors: Vec<ValidationError>,
+    },
+}
+
+/// Result of a generation operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum GenerationResult {
+    /// Generation succeeded
+    #[serde(rename = "success")]
+    Success {
+        /// Base64-encoded PDF data
+        pdf_base64: String,
+    },
+    /// Generation failed (validation or compilation error)
+    #[serde(rename = "error")]
+    Error {
+        /// Error message
+        message: String,
+        /// Validation errors if applicable
+        #[serde(skip_serializing_if = "Option::is_none")]
+        validation_errors: Option<Vec<ValidationError>>,
     },
 }
 
@@ -53,32 +81,40 @@ impl ValidationError {
 
 /// Returns a list of all available tools
 pub fn list_tools() -> Vec<Tool> {
-    // Build input schema as a Map<String, Value>
-    let mut schema = serde_json::Map::new();
-    schema.insert("type".to_string(), Value::String("object".to_string()));
-
-    let mut properties = serde_json::Map::new();
+    // Shared schema for resume input
     let mut resume_prop = serde_json::Map::new();
     resume_prop.insert("type".to_string(), Value::String("object".to_string()));
     resume_prop.insert(
         "description".to_string(),
-        Value::String("The resume JSON payload to validate against the schema. Use resources/read on 'docgen://schemas/resume' to get the full schema.".to_string()),
+        Value::String("The resume JSON payload. Use resources/read on 'docgen://schemas/resume' to get the full schema.".to_string()),
     );
-    properties.insert("resume".to_string(), Value::Object(resume_prop));
 
+    let mut properties = serde_json::Map::new();
+    properties.insert("resume".to_string(), Value::Object(resume_prop.clone()));
+
+    let mut schema = serde_json::Map::new();
+    schema.insert("type".to_string(), Value::String("object".to_string()));
     schema.insert("properties".to_string(), Value::Object(properties));
     schema.insert(
         "required".to_string(),
         Value::Array(vec![Value::String("resume".to_string())]),
     );
 
-    let tool = Tool::new(
+    let schema_arc = Arc::new(schema);
+
+    let validate_tool = Tool::new(
         VALIDATE_RESUME_TOOL,
         "Validates a resume JSON payload against the schema without generating a document. Returns validation errors with paths if invalid, or confirms validity.",
-        Arc::new(schema),
+        schema_arc.clone(),
     );
 
-    vec![tool]
+    let generate_tool = Tool::new(
+        GENERATE_RESUME_TOOL,
+        "Generates a PDF resume from a JSON payload. Returns base64-encoded PDF data.",
+        schema_arc,
+    );
+
+    vec![validate_tool, generate_tool]
 }
 
 /// Input for the validate_resume tool
@@ -99,7 +135,10 @@ pub fn validate_resume(input: Value) -> ValidationResult {
             return ValidationResult::Invalid {
                 errors: vec![ValidationError::new(
                     "",
-                    format!("Invalid tool input: expected object with 'resume' field. {}", e),
+                    format!(
+                        "Invalid tool input: expected object with 'resume' field. {}",
+                        e
+                    ),
                 )],
             };
         }
@@ -107,10 +146,63 @@ pub fn validate_resume(input: Value) -> ValidationResult {
 
     // Then validate the resume payload itself
     match serde_json::from_value::<Resume>(parsed_input.resume) {
-        Ok(resume) => ValidationResult::Valid { resume: Box::new(resume) },
+        Ok(resume) => ValidationResult::Valid {
+            resume: Box::new(resume),
+        },
         Err(e) => ValidationResult::Invalid {
             errors: parse_serde_error(&e),
         },
+    }
+}
+
+/// Generates a PDF resume from a JSON payload
+pub fn generate_resume(input: Value) -> GenerationResult {
+    // 1. Validate
+    let validation_result = validate_resume(input);
+
+    let resume = match validation_result {
+        ValidationResult::Valid { resume } => resume,
+        ValidationResult::Invalid { errors } => {
+            return GenerationResult::Error {
+                message: "Validation failed".to_string(),
+                validation_errors: Some(errors),
+            };
+        }
+    };
+
+    // 2. Transform
+    let source = match transform_resume(&resume) {
+        Ok(s) => s,
+        Err(e) => {
+            return GenerationResult::Error {
+                message: format!("Failed to transform resume to Typst: {}", e),
+                validation_errors: None,
+            };
+        }
+    };
+
+    // 3. Compile
+    let pdf_bytes = match compile(source) {
+        Ok(bytes) => bytes,
+        Err(diags) => {
+            // Convert diagnostics to string
+            let msg = diags
+                .iter()
+                .map(|d| format!("{:?}: {}", d.severity, d.message))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return GenerationResult::Error {
+                message: format!("Typst compilation failed:\n{}", msg),
+                validation_errors: None,
+            };
+        }
+    };
+
+    // 4. Encode
+    let base64_pdf = general_purpose::STANDARD.encode(pdf_bytes);
+
+    GenerationResult::Success {
+        pdf_base64: base64_pdf,
     }
 }
 
@@ -167,7 +259,14 @@ fn extract_path_hint(message: &str) -> String {
     // We try to extract useful context
 
     // Look for patterns like "Basics" or "WorkExperience" in the error
-    let type_hints = ["Basics", "WorkExperience", "Education", "Skill", "Profile", "Resume"];
+    let type_hints = [
+        "Basics",
+        "WorkExperience",
+        "Education",
+        "Skill",
+        "Profile",
+        "Resume",
+    ];
 
     for hint in type_hints {
         if message.contains(hint) {
@@ -206,8 +305,11 @@ pub fn call_tool(name: &str, arguments: Value) -> Result<Value, String> {
     match name {
         VALIDATE_RESUME_TOOL => {
             let result = validate_resume(arguments);
-            serde_json::to_value(result)
-                .map_err(|e| format!("Failed to serialize result: {}", e))
+            serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
+        }
+        GENERATE_RESUME_TOOL => {
+            let result = generate_resume(arguments);
+            serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }
@@ -220,10 +322,12 @@ mod tests {
     #[test]
     fn test_list_tools() {
         let tools = list_tools();
-        assert_eq!(tools.len(), 1);
+        assert_eq!(tools.len(), 2);
         assert_eq!(tools[0].name, VALIDATE_RESUME_TOOL);
+        assert_eq!(tools[1].name, GENERATE_RESUME_TOOL);
     }
 
+    // ... existing validate tests ...
     #[test]
     fn test_validate_valid_resume() {
         let input = serde_json::json!({
@@ -254,6 +358,7 @@ mod tests {
         }
     }
 
+    // Ensure all previous tests are kept
     #[test]
     fn test_validate_full_resume_fixture() {
         let fixture = include_str!("../../tests/fixtures/sample_resume.json");
@@ -315,7 +420,11 @@ mod tests {
             ValidationResult::Invalid { errors } => {
                 assert!(!errors.is_empty());
                 let error_text = format!("{:?}", errors);
-                assert!(error_text.contains("email"), "Expected error about missing email: {}", error_text);
+                assert!(
+                    error_text.contains("email"),
+                    "Expected error about missing email: {}",
+                    error_text
+                );
             }
             ValidationResult::Valid { .. } => {
                 panic!("Expected invalid result for missing email");
@@ -365,7 +474,10 @@ mod tests {
         match result {
             ValidationResult::Invalid { errors } => {
                 assert!(!errors.is_empty());
-                assert!(errors[0].message.contains("invalid type") || errors[0].message.contains("expected"));
+                assert!(
+                    errors[0].message.contains("invalid type")
+                        || errors[0].message.contains("expected")
+                );
             }
             ValidationResult::Valid { .. } => {
                 panic!("Expected invalid result for wrong type");
@@ -396,7 +508,11 @@ mod tests {
             ValidationResult::Invalid { errors } => {
                 assert!(!errors.is_empty());
                 let error_text = format!("{:?}", errors);
-                assert!(error_text.contains("position"), "Expected error about missing position: {}", error_text);
+                assert!(
+                    error_text.contains("position"),
+                    "Expected error about missing position: {}",
+                    error_text
+                );
             }
             ValidationResult::Valid { .. } => {
                 panic!("Expected invalid result for missing position");
@@ -494,6 +610,7 @@ mod tests {
                 work: vec![],
                 education: vec![],
                 skills: vec![],
+                projects: vec![],
                 publications: None,
             }),
         };
@@ -506,9 +623,10 @@ mod tests {
     #[test]
     fn test_validation_error_serialization() {
         let invalid_result = ValidationResult::Invalid {
-            errors: vec![
-                ValidationError::new("basics.email", "Missing required field: email"),
-            ],
+            errors: vec![ValidationError::new(
+                "basics.email",
+                "Missing required field: email",
+            )],
         };
 
         let json = serde_json::to_string(&invalid_result).unwrap();
@@ -625,5 +743,80 @@ mod tests {
                 panic!("Expected invalid result for fixture with work entry missing position");
             }
         }
+    }
+
+    // New tests for generation
+    #[test]
+    fn test_generate_resume_valid() {
+        let input = serde_json::json!({
+            "resume": {
+                "basics": {
+                    "name": "John Doe",
+                    "email": "john@example.com"
+                },
+                "work": []
+            }
+        });
+
+        // This is a slow test because it compiles PDF
+        let result = generate_resume(input);
+
+        match result {
+            GenerationResult::Success { pdf_base64 } => {
+                assert!(!pdf_base64.is_empty());
+                assert!(pdf_base64.len() > 100); // Should be a reasonable size
+            }
+            GenerationResult::Error { message, .. } => {
+                panic!("Expected success, got error: {}", message);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_resume_invalid() {
+        let input = serde_json::json!({
+            "resume": {
+                "basics": {
+                    "name": "John Doe"
+                    // missing email
+                },
+                "work": []
+            }
+        });
+
+        let result = generate_resume(input);
+
+        match result {
+            GenerationResult::Error {
+                message,
+                validation_errors,
+            } => {
+                assert!(message.contains("Validation failed"));
+                assert!(validation_errors.is_some());
+            }
+            GenerationResult::Success { .. } => {
+                panic!("Expected error for invalid input");
+            }
+        }
+    }
+
+    #[test]
+    fn test_call_tool_generate_resume() {
+        let input = serde_json::json!({
+            "resume": {
+                "basics": {
+                    "name": "John Doe",
+                    "email": "john@example.com"
+                },
+                "work": []
+            }
+        });
+
+        let result = call_tool(GENERATE_RESUME_TOOL, input);
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert_eq!(value["status"], "success");
+        assert!(value.get("pdf_base64").is_some());
     }
 }

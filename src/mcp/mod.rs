@@ -1,4 +1,4 @@
 // MCP handler modules
-pub mod resources;
 pub mod prompts;
+pub mod resources;
 pub mod tools;

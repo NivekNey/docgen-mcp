@@ -1,15 +1,10 @@
+use rmcp::{ErrorData, ServerHandler, ServiceExt, model::*};
 use std::env;
-use tracing::{info, Level};
+use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
-use rmcp::{
-    ErrorData,
-    ServerHandler,
-    ServiceExt,
-    model::*,
-};
 
-mod mcp;
 mod documents;
+mod mcp;
 mod typst;
 
 use mcp::{resources, tools};
@@ -20,8 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(
         FmtSubscriber::builder()
             .with_max_level(Level::INFO)
-            .finish()
-    ).expect("Failed to set tracing subscriber");
+            .finish(),
+    )
+    .expect("Failed to set tracing subscriber");
 
     info!("Starting docgen-mcp server");
 
@@ -58,11 +54,10 @@ async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
     use axum::Router;
-    use std::net::SocketAddr;
     use rmcp::transport::streamable_http_server::{
-        StreamableHttpService,
-        session::local::LocalSessionManager,
+        StreamableHttpService, session::local::LocalSessionManager,
     };
+    use std::net::SocketAddr;
 
     // Get port from environment or use default
     let port = env::var("PORT")
@@ -72,7 +67,10 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    info!("Starting MCP server with Streamable HTTP transport on {}", addr);
+    info!(
+        "Starting MCP server with Streamable HTTP transport on {}",
+        addr
+    );
 
     // Create the streamable HTTP service
     let service = StreamableHttpService::new(
@@ -124,7 +122,8 @@ impl ServerHandler for DocgenServer {
             instructions: Some(
                 "A Model Context Protocol server for programmatic document generation, \
                  powered by Typst. Use this server to generate professionally typeset \
-                 documents like resumes and CVs.".to_string()
+                 documents like resumes and CVs."
+                    .to_string(),
             ),
         }
     }

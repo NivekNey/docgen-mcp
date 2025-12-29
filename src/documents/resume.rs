@@ -27,10 +27,48 @@ pub struct Resume {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<Skill>,
 
+    /// Projects
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projects: Vec<Project>,
+
     /// Publications summary (free-form text)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "Free-form text describing publications, e.g., '11 peer-reviewed publications at EMNLP, IEEE TNNLS, IEEE Big Data, ACM CIKM on text moderation, hate speech detection, ad creative optimization, and graph neural networks'")]
+    #[schemars(
+        description = "Free-form text describing publications, e.g., '11 peer-reviewed publications at EMNLP, IEEE TNNLS, IEEE Big Data, ACM CIKM on text moderation, hate speech detection, ad creative optimization, and graph neural networks'"
+    )]
     pub publications: Option<String>,
+}
+
+/// A project entry
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[schemars(description = "A project entry")]
+pub struct Project {
+    /// Project name
+    pub name: String,
+
+    /// Project description or summary
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// URL to the project
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+
+    /// Start date
+    #[serde(rename = "startDate", skip_serializing_if = "Option::is_none")]
+    pub start_date: Option<String>,
+
+    /// End date
+    #[serde(rename = "endDate", skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<String>,
+
+    /// Technologies or keywords used
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keywords: Vec<String>,
+
+    /// Key achievements or highlights
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub highlights: Vec<String>,
 }
 
 /// Basic personal information
@@ -83,6 +121,10 @@ pub struct WorkExperience {
     /// Job title or position
     pub position: String,
 
+    /// Location (city, state/country)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+
     /// Start date (YYYY-MM-DD or YYYY-MM format)
     #[serde(rename = "startDate", skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Start date in YYYY-MM-DD or YYYY-MM format")]
@@ -90,7 +132,9 @@ pub struct WorkExperience {
 
     /// End date (YYYY-MM-DD, YYYY-MM format, or "Present")
     #[serde(rename = "endDate", skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "End date in YYYY-MM-DD or YYYY-MM format, or 'Present' for current positions")]
+    #[schemars(
+        description = "End date in YYYY-MM-DD or YYYY-MM format, or 'Present' for current positions"
+    )]
     pub end_date: Option<String>,
 
     /// Key achievements and responsibilities
@@ -113,6 +157,10 @@ pub struct Education {
     #[serde(rename = "fieldOfStudy", skip_serializing_if = "Option::is_none")]
     pub field_of_study: Option<String>,
 
+    /// Location (city, state/country)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+
     /// Start date (YYYY-MM-DD or YYYY-MM format)
     #[serde(rename = "startDate", skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Start date in YYYY-MM-DD or YYYY-MM format")]
@@ -120,7 +168,9 @@ pub struct Education {
 
     /// End date or expected graduation (YYYY-MM-DD, YYYY-MM format, or "Expected YYYY")
     #[serde(rename = "endDate", skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "End date in YYYY-MM-DD or YYYY-MM format, or 'Expected YYYY' for ongoing")]
+    #[schemars(
+        description = "End date in YYYY-MM-DD or YYYY-MM format, or 'Expected YYYY' for ongoing"
+    )]
     pub end_date: Option<String>,
 
     /// GPA or grade (optional)
@@ -165,6 +215,7 @@ mod tests {
             work: vec![WorkExperience {
                 company: "Tech Corp".to_string(),
                 position: "Senior Engineer".to_string(),
+                location: Some("San Francisco, CA".to_string()),
                 start_date: Some("2020-01".to_string()),
                 end_date: Some("Present".to_string()),
                 highlights: vec!["Led team of 5 engineers".to_string()],
@@ -173,6 +224,7 @@ mod tests {
                 institution: "MIT".to_string(),
                 degree: Some("B.S.".to_string()),
                 field_of_study: Some("Computer Science".to_string()),
+                location: Some("Cambridge, MA".to_string()),
                 start_date: Some("2012-09".to_string()),
                 end_date: Some("2016-05".to_string()),
                 gpa: Some("3.8".to_string()),
@@ -182,6 +234,7 @@ mod tests {
                 name: "Programming Languages".to_string(),
                 keywords: vec!["Rust".to_string(), "Python".to_string()],
             }],
+            projects: vec![],
             publications: Some("5 peer-reviewed publications at NeurIPS and ICML".to_string()),
         };
 
@@ -228,8 +281,8 @@ mod tests {
     #[test]
     fn test_sample_fixture_deserialization() {
         let fixture = include_str!("../../tests/fixtures/sample_resume.json");
-        let resume: Resume = serde_json::from_str(fixture)
-            .expect("Sample fixture should deserialize correctly");
+        let resume: Resume =
+            serde_json::from_str(fixture).expect("Sample fixture should deserialize correctly");
 
         assert_eq!(resume.basics.name, "Jane Smith");
         assert_eq!(resume.basics.email, "jane.smith@example.com");

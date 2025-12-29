@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 
 use time::OffsetDateTime;
+use typst::Library;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime};
 use typst::syntax::{FileId, Source, VirtualPath};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
-use typst::Library;
-// The compiler suggested importing LibraryExt from typst::LibraryExt, 
+// The compiler suggested importing LibraryExt from typst::LibraryExt,
 // but sometimes it's typst::foundations or elsewhere.
 // I'll try typst::LibraryExt based on the suggestion.
 // If that fails, I'll try typst::library::LibraryExt.
 // Actually, typst 0.14 seems to have it at typst::LibraryExt ?
 // Let's try importing it.
-// Wait, if I can't find it, I can construct Library manually? 
+// Wait, if I can't find it, I can construct Library manually?
 // Library::builder() also comes from LibraryExt.
 // Let's assume the compiler suggestion is correct.
-use typst::LibraryExt; 
+use typst::LibraryExt;
 use typst::World;
 
 pub struct DocgenWorld {
@@ -83,10 +83,6 @@ impl World for DocgenWorld {
 
     fn today(&self, _offset: Option<i64>) -> Option<Datetime> {
         let date = self.now.date();
-        Datetime::from_ymd(
-            date.year(),
-            date.month() as u8,
-            date.day(),
-        )
+        Datetime::from_ymd(date.year(), date.month() as u8, date.day())
     }
 }

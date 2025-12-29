@@ -352,16 +352,16 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 4: Resume Generation Tool
+### Milestone 4: Resume Generation Tool ✅
 > *Full pipeline: JSON → Typst → PDF*
 
-- [ ] Transform `Resume` struct into Typst markup string
-- [ ] Wire up `generate_resume` tool: validate → transform → compile → encode
-- [ ] Return PDF as base64 in tool response
-- [ ] Add error handling for compilation failures
-- [ ] Integration test: sample JSON → valid PDF
+- [x] Transform `Resume` struct into Typst markup string
+- [x] Wire up `generate_resume` tool: validate → transform → compile → encode
+- [x] Return PDF as base64 in tool response
+- [x] Add error handling for compilation failures
+- [x] Integration test: sample JSON → valid PDF
 
-**Deliverable:** End-to-end resume generation works
+**Deliverable:** End-to-end resume generation works ✅
 
 ---
 
