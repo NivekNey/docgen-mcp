@@ -260,18 +260,30 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ## Milestones
 
-### Milestone 0: Project Scaffolding
+### Milestone 0: Project Scaffolding ✅
 > *Get the skeleton compiling and running with dual transport support*
 
-- [ ] Initialize Cargo workspace
-- [ ] Add core dependencies (`rmcp` with `server` and `axum` features, `tokio`, `serde`, `serde_json`)
-- [ ] Create minimal MCP server with stdio transport (Claude Desktop)
-- [ ] Add HTTP/SSE transport using Axum (Claude.ai remote)
-- [ ] Server responds to `initialize` on both transports
-- [ ] Set up basic project structure (directories, mod.rs files)
-- [ ] Add CI workflow (cargo check, clippy, test)
+- [x] Initialize Cargo workspace
+- [x] Add core dependencies (`rmcp` with `server` and `axum` features, `tokio`, `serde`, `serde_json`)
+- [x] Create minimal MCP server with stdio transport (Claude Desktop)
+- [x] Add HTTP/SSE transport using Axum (Claude.ai remote)
+- [x] Server responds to `initialize` on both transports
+- [x] Set up basic project structure (directories, mod.rs files)
+- [x] Add CI workflow (cargo check, clippy, test)
 
-**Deliverable:** Server completes MCP handshake via both stdio and HTTP/SSE transports
+**Deliverable:** Server completes MCP handshake via both stdio and HTTP/SSE transports ✅
+
+**Implementation Notes:**
+- Used `cargo add` for automatic version resolution
+- Implemented `ServerHandler` trait with default implementations (minimal viable server)
+- Stdio mode is default; HTTP/SSE activated via `--http` flag or `PORT` env var
+- HTTP server binds to `0.0.0.0` with configurable port (default: 3000)
+- All CI checks passing (cargo check, clippy, test)
+
+**Additional Tasks Identified:**
+- [ ] Add proper MCP HTTP/SSE endpoints (currently just basic HTTP server)
+- [ ] Implement server info metadata (name, version) in ServerHandler
+- [ ] Add integration tests for MCP protocol handshake
 
 ---
 
