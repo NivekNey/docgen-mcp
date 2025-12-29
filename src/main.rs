@@ -54,10 +54,12 @@ async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
     use axum::Router;
+    use axum::http::{HeaderName, HeaderValue, Method};
     use rmcp::transport::streamable_http_server::{
         StreamableHttpService, session::local::LocalSessionManager,
     };
     use std::net::SocketAddr;
+    use tower_http::cors::CorsLayer;
 
     // Get port from environment or use default
     let port = env::var("PORT")
@@ -79,8 +81,29 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     );
 
-    // Create axum router with MCP endpoint
-    let app = Router::new().nest_service("/mcp", service);
+    // Configure CORS for Claude.ai and other MCP clients
+    let cors = CorsLayer::new()
+        .allow_origin([
+            "https://claude.ai".parse::<HeaderValue>().unwrap(),
+            "https://www.claude.ai".parse::<HeaderValue>().unwrap(),
+        ])
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+            axum::http::header::AUTHORIZATION,
+            HeaderName::from_static("mcp-session-id"),
+            HeaderName::from_static("last-event-id"),
+        ])
+        .expose_headers([
+            HeaderName::from_static("mcp-session-id"),
+        ])
+        .allow_credentials(true);
+
+    // Create axum router with MCP endpoint and CORS
+    let app = Router::new()
+        .nest_service("/mcp", service)
+        .layer(cors);
 
     info!("MCP server listening on {} (endpoint: /mcp)", addr);
 
