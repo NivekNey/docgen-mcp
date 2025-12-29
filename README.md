@@ -339,16 +339,16 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 3: Typst Integration
+### Milestone 3: Typst Integration ✅
 > *Compile a minimal Typst document to PDF*
 
-- [ ] Add Typst crates (`typst`, `typst-pdf`, `typst-kit`, `typst-assets`)
-- [ ] Implement `World` trait for in-memory compilation
-- [ ] Create minimal resume Typst template
-- [ ] Compile hardcoded content to PDF as proof-of-concept
-- [ ] Handle font loading (embed via `typst-assets` or bundle subset)
+- [x] Add Typst crates (`typst`, `typst-pdf`, `typst-kit`, `typst-assets`)
+- [x] Implement `World` trait for in-memory compilation
+- [x] Create minimal resume Typst template
+- [x] Compile hardcoded content to PDF as proof-of-concept
+- [x] Handle font loading (embed via `typst-assets` or bundle subset)
 
-**Deliverable:** Server can produce a PDF from static Typst source
+**Deliverable:** Server can produce a PDF from static Typst source ✅
 
 ---
 
