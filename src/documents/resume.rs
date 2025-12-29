@@ -31,6 +31,18 @@ pub struct Resume {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub projects: Vec<Project>,
 
+    /// Professional certifications
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub certifications: Vec<Certification>,
+
+    /// Awards and honors
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub awards: Vec<Award>,
+
+    /// Languages spoken
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub languages: Vec<Language>,
+
     /// Publications summary (free-form text)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(
@@ -194,6 +206,62 @@ pub struct Skill {
     pub keywords: Vec<String>,
 }
 
+/// A professional certification
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[schemars(description = "A professional certification or license")]
+pub struct Certification {
+    /// Certification name
+    pub name: String,
+
+    /// Issuing organization
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+
+    /// Date obtained (YYYY-MM-DD or YYYY-MM format)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Date obtained in YYYY-MM-DD or YYYY-MM format")]
+    pub date: Option<String>,
+
+    /// URL to verify or view the certification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(url)]
+    pub url: Option<String>,
+}
+
+/// An award or honor
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[schemars(description = "An award, honor, or recognition")]
+pub struct Award {
+    /// Award title
+    pub title: String,
+
+    /// Awarding organization or entity
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub awarder: Option<String>,
+
+    /// Date received (YYYY-MM-DD or YYYY-MM format)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Date received in YYYY-MM-DD or YYYY-MM format")]
+    pub date: Option<String>,
+
+    /// Brief description of the award
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+/// A language proficiency
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[schemars(description = "A language and proficiency level")]
+pub struct Language {
+    /// Language name (e.g., "English", "Spanish", "Mandarin")
+    pub language: String,
+
+    /// Proficiency level (e.g., "Native", "Fluent", "Intermediate", "Basic")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Proficiency level: Native, Fluent, Professional, Intermediate, Basic")]
+    pub fluency: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,6 +303,22 @@ mod tests {
                 keywords: vec!["Rust".to_string(), "Python".to_string()],
             }],
             projects: vec![],
+            certifications: vec![Certification {
+                name: "AWS Solutions Architect".to_string(),
+                issuer: Some("Amazon Web Services".to_string()),
+                date: Some("2023-06".to_string()),
+                url: None,
+            }],
+            awards: vec![Award {
+                title: "Employee of the Year".to_string(),
+                awarder: Some("Tech Corp".to_string()),
+                date: Some("2022-12".to_string()),
+                summary: None,
+            }],
+            languages: vec![Language {
+                language: "English".to_string(),
+                fluency: Some("Native".to_string()),
+            }],
             publications: Some("5 peer-reviewed publications at NeurIPS and ICML".to_string()),
         };
 

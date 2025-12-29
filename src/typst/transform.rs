@@ -60,6 +60,9 @@ mod tests {
             education: vec![],
             skills: vec![],
             projects: vec![],
+            certifications: vec![],
+            awards: vec![],
+            languages: vec![],
             publications: None,
         };
 
@@ -88,6 +91,9 @@ mod tests {
             education: vec![],
             skills: vec![],
             projects: vec![],
+            certifications: vec![],
+            awards: vec![],
+            languages: vec![],
             publications: None,
         };
 
