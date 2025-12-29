@@ -7,7 +7,7 @@ mod documents;
 mod mcp;
 mod typst;
 
-use mcp::{resources, tools};
+use mcp::{prompts, resources, tools};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -109,6 +109,7 @@ impl ServerHandler for DocgenServer {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2025_03_26,
             capabilities: ServerCapabilities::builder()
+                .enable_prompts()
                 .enable_resources()
                 .enable_tools()
                 .build(),
@@ -151,6 +152,32 @@ impl ServerHandler for DocgenServer {
             }),
             None => Err(ErrorData::resource_not_found(
                 format!("Resource not found: {}", request.uri),
+                None,
+            )),
+        }
+    }
+
+    async fn list_prompts(
+        &self,
+        _request: Option<PaginatedRequestParam>,
+        _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<ListPromptsResult, ErrorData> {
+        Ok(ListPromptsResult {
+            prompts: prompts::list_prompts(),
+            next_cursor: None,
+            meta: None,
+        })
+    }
+
+    async fn get_prompt(
+        &self,
+        request: GetPromptRequestParam,
+        _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<GetPromptResult, ErrorData> {
+        match prompts::get_prompt(&request.name) {
+            Some(result) => Ok(result),
+            None => Err(ErrorData::resource_not_found(
+                format!("Prompt not found: {}", request.name),
                 None,
             )),
         }

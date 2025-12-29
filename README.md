@@ -383,15 +383,26 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 5: Best Practices Prompt
+### Milestone 5: Best Practices Prompt ✅
 > *Guide LLMs toward better resume content*
 
-- [ ] Write resume best practices content (concise, actionable)
-- [ ] Implement MCP `prompts/list` handler
-- [ ] Implement MCP `prompts/get` handler for `resume-best-practices`
-- [ ] Include schema reference in prompt for context
+- [x] Write resume best practices content (concise, actionable)
+- [x] Implement MCP `prompts/list` handler
+- [x] Implement MCP `prompts/get` handler for `resume-best-practices`
+- [x] Include schema reference in prompt for context
 
-**Deliverable:** Clients can request guidance before generating
+**Deliverable:** Clients can request guidance before generating ✅
+
+**Implementation Notes:**
+- Created `src/mcp/prompts.rs` with comprehensive resume writing guidelines
+- Prompt includes content guidelines (contact info, summary, work experience, education, skills, projects)
+- Writing style do's and don'ts (concise, no pronouns, quantify achievements, etc.)
+- Full JSON schema embedded in prompt for LLM context
+- Schema URI reference for workflow guidance
+- Prompts capability enabled via `ServerCapabilities::builder().enable_prompts()`
+- `list_prompts` and `get_prompt` handlers wired up in `ServerHandler`
+- 5 new prompt-related tests added
+- All 40 tests (37 unit + 3 integration) passing ✅
 
 ---
 
