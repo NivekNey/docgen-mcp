@@ -1,7 +1,11 @@
 use std::env;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
-use rmcp::{ServerHandler, ServiceExt};
+use rmcp::{
+    ServerHandler,
+    ServiceExt,
+    model::*,
+};
 
 mod mcp;
 mod documents;
@@ -50,8 +54,12 @@ async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
-    use axum::{routing::get, Router};
+    use axum::Router;
     use std::net::SocketAddr;
+    use rmcp::transport::streamable_http_server::{
+        StreamableHttpService,
+        session::local::LocalSessionManager,
+    };
 
     // Get port from environment or use default
     let port = env::var("PORT")
@@ -61,17 +69,27 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    info!("Starting MCP server with HTTP/SSE transport on {}", addr);
+    info!("Starting MCP server with Streamable HTTP transport on {}", addr);
 
-    // Create a basic HTTP router (MCP SSE endpoints will be added here)
-    let app = Router::new()
-        .route("/", get(|| async { "docgen-mcp server" }));
+    // Create the streamable HTTP service
+    let service = StreamableHttpService::new(
+        || Ok(DocgenServer::new()),
+        LocalSessionManager::default().into(),
+        Default::default(),
+    );
 
-    info!("HTTP server listening on {}", addr);
+    // Create axum router with MCP endpoint
+    let app = Router::new().nest_service("/mcp", service);
+
+    info!("MCP server listening on {} (endpoint: /mcp)", addr);
 
     // Start the server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            tokio::signal::ctrl_c().await.unwrap();
+        })
+        .await?;
 
     Ok(())
 }
@@ -86,6 +104,22 @@ impl DocgenServer {
 }
 
 impl ServerHandler for DocgenServer {
-    // Empty implementation for now - will be filled in later milestones
-    // The trait provides default implementations for all methods
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            protocol_version: ProtocolVersion::V_2025_03_26,
+            capabilities: ServerCapabilities::builder().build(),
+            server_info: Implementation {
+                name: "docgen-mcp".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                title: Some("Document Generation MCP Server".to_string()),
+                website_url: None,
+                icons: None,
+            },
+            instructions: Some(
+                "A Model Context Protocol server for programmatic document generation, \
+                 powered by Typst. Use this server to generate professionally typeset \
+                 documents like resumes and CVs.".to_string()
+            ),
+        }
+    }
 }

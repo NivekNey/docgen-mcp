@@ -275,15 +275,18 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 **Implementation Notes:**
 - Used `cargo add` for automatic version resolution
-- Implemented `ServerHandler` trait with default implementations (minimal viable server)
-- Stdio mode is default; HTTP/SSE activated via `--http` flag or `PORT` env var
+- Implemented `ServerHandler` trait with `get_info()` method providing server metadata
+- Stdio mode is default; HTTP activated via `--http` flag or `PORT` env var
+- HTTP server uses Streamable HTTP transport (MCP protocol version 2025-03-26)
 - HTTP server binds to `0.0.0.0` with configurable port (default: 3000)
+- MCP endpoint available at `/mcp` for HTTP mode
+- Integration tests verify both stdio and HTTP server startup
 - All CI checks passing (cargo check, clippy, test)
 
 **Additional Tasks Identified:**
-- [ ] Add proper MCP HTTP/SSE endpoints (currently just basic HTTP server)
-- [ ] Implement server info metadata (name, version) in ServerHandler
-- [ ] Add integration tests for MCP protocol handshake
+- [x] Add proper MCP HTTP/SSE endpoints (using Streamable HTTP transport)
+- [x] Implement server info metadata (name, version) in ServerHandler
+- [x] Add integration tests for MCP protocol handshake
 
 ---
 
