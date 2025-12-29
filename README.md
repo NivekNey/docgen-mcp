@@ -350,6 +350,14 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 **Deliverable:** Server can produce a PDF from static Typst source ✅
 
+**Implementation Notes:**
+- Added `typst`, `typst-pdf`, and `typst-assets` with `fonts` feature enabled
+- Implemented `DocgenWorld` using the `typst::World` trait for in-memory compilation
+- Created `compile` function in `src/typst/compiler.rs` to orchestrate PDF generation
+- Integrated `typst-assets` to provide professional fonts (Libertinus Serif)
+- Added `pdf-extract` dev-dependency to verify PDF content in unit tests
+- 26 unit tests + 3 integration tests passing
+
 ---
 
 ### Milestone 4: Resume Generation Tool ✅
@@ -362,6 +370,16 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 - [x] Integration test: sample JSON → valid PDF
 
 **Deliverable:** End-to-end resume generation works ✅
+
+**Implementation Notes:**
+- Redesigned `templates/resume.typ` to be a functional, dynamic template
+- Implemented professional "Jake Ryan" layout (centered header, small-caps sections, 4-quadrant entries)
+- Added `Project` struct to schema and `location` fields to `WorkExperience` and `Education`
+- Created `src/typst/transform.rs` to safely inject JSON data into Typst
+- Implemented `generate_resume` tool that combines validation, transformation, and compilation
+- Integrated `base64` for encoding PDF output in MCP tool responses
+- Increased integration test timeouts to handle increased binary size and startup time
+- All 35 tests (32 unit + 3 integration) passing ✅
 
 ---
 
