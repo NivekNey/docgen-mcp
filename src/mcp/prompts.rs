@@ -41,8 +41,7 @@ pub fn get_prompt(name: &str) -> Option<GetPromptResult> {
 fn build_resume_best_practices_prompt() -> GetPromptResult {
     // Generate the schema for reference
     let schema = schemars::schema_for!(Resume);
-    let schema_json =
-        serde_json::to_string_pretty(&schema).expect("Failed to serialize schema");
+    let schema_json = serde_json::to_string_pretty(&schema).expect("Failed to serialize schema");
 
     // Replace placeholders in the template
     let content = BEST_PRACTICES_TEMPLATE
@@ -119,6 +118,20 @@ mod tests {
             assert!(
                 text.contains(RESUME_SCHEMA_URI),
                 "Prompt should reference the schema URI"
+            );
+        } else {
+            panic!("Expected text content");
+        }
+    }
+
+    #[test]
+    fn test_prompt_placeholders_are_replaced() {
+        let result = get_prompt(RESUME_BEST_PRACTICES_PROMPT).unwrap();
+
+        if let rmcp::model::PromptMessageContent::Text { text } = &result.messages[0].content {
+            assert!(
+                !text.contains("{{"),
+                "Unreplaced placeholder found in prompt"
             );
         } else {
             panic!("Expected text content");

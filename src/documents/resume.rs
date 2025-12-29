@@ -51,7 +51,11 @@ pub struct Resume {
     pub publications: Option<String>,
 
     /// Custom section ordering
-    #[serde(rename = "sectionOrder", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "sectionOrder",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     #[schemars(
         description = "Custom section ordering. Array of section names to display in order. Valid sections: 'education', 'experience', 'projects', 'certifications', 'awards', 'publications', 'skills', 'languages'. If not specified, uses default order. Omit a section from the list to hide it."
     )]
@@ -265,7 +269,9 @@ pub struct Language {
 
     /// Proficiency level (e.g., "Native", "Fluent", "Intermediate", "Basic")
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "Proficiency level: Native, Fluent, Professional, Intermediate, Basic")]
+    #[schemars(
+        description = "Proficiency level: Native, Fluent, Professional, Intermediate, Basic"
+    )]
     pub fluency: Option<String>,
 }
 
