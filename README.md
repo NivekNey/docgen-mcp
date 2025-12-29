@@ -315,16 +315,27 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 2: Validation Tool
+### Milestone 2: Validation Tool ✅
 > *Accept JSON payloads and validate via type deserialization*
 
-- [ ] Implement `validate_resume` tool
-- [ ] Use `serde_json::from_value` to deserialize and validate
-- [ ] Convert serde errors into structured validation errors (path + message)
-- [ ] Add integration tests with valid/invalid fixtures
-- [ ] Test edge cases (missing required fields, wrong types, etc.)
+- [x] Implement `validate_resume` tool
+- [x] Use `serde_json::from_value` to deserialize and validate
+- [x] Convert serde errors into structured validation errors (path + message)
+- [x] Add integration tests with valid/invalid fixtures
+- [x] Test edge cases (missing required fields, wrong types, etc.)
 
-**Deliverable:** `validate_resume` tool returns success or detailed serde validation errors
+**Deliverable:** `validate_resume` tool returns success or detailed serde validation errors ✅
+
+**Implementation Notes:**
+- Tool implemented in `src/mcp/tools.rs` with `ValidationResult` enum (Valid/Invalid)
+- `ValidationError` struct provides structured errors with `path` and `message` fields
+- Serde error parsing extracts field names and infers paths from type context
+- Tools capability enabled via `ServerCapabilities::builder().enable_tools()`
+- `list_tools` and `call_tool` handlers wired up in `ServerHandler`
+- Returns structured JSON response via `CallToolResult::structured()`
+- 4 invalid fixture files added for testing edge cases
+- 17 tool-related tests covering valid, invalid, and edge cases
+- All 28 tests passing (25 unit + 3 integration)
 
 ---
 

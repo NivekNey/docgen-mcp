@@ -1,0 +1,11 @@
+{
+  "basics": {
+    "name": "John Doe"
+  },
+  "work": [
+    {
+      "company": "Tech Corp",
+      "position": "Engineer"
+    }
+  ]
+}

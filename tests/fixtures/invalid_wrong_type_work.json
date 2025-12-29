@@ -1,0 +1,7 @@
+{
+  "basics": {
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "work": "not an array"
+}

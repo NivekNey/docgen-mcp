@@ -1,0 +1,11 @@
+{
+  "basics": {
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "work": [
+    {
+      "company": "Tech Corp"
+    }
+  ]
+}

@@ -12,7 +12,7 @@ mod mcp;
 mod documents;
 mod typst;
 
-use mcp::resources;
+use mcp::{resources, tools};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,6 +112,7 @@ impl ServerHandler for DocgenServer {
             protocol_version: ProtocolVersion::V_2025_03_26,
             capabilities: ServerCapabilities::builder()
                 .enable_resources()
+                .enable_tools()
                 .build(),
             server_info: Implementation {
                 name: "docgen-mcp".to_string(),
@@ -153,6 +154,34 @@ impl ServerHandler for DocgenServer {
                 format!("Resource not found: {}", request.uri),
                 None,
             )),
+        }
+    }
+
+    async fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParam>,
+        _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<ListToolsResult, ErrorData> {
+        Ok(ListToolsResult {
+            tools: tools::list_tools(),
+            next_cursor: None,
+            meta: None,
+        })
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParam,
+        _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Convert Map<String, Value> to Value::Object
+        let arguments = serde_json::Value::Object(request.arguments.unwrap_or_default());
+
+        match tools::call_tool(&request.name, arguments) {
+            Ok(result) => Ok(CallToolResult::structured(result)),
+            Err(e) => Ok(CallToolResult::structured_error(serde_json::json!({
+                "error": e
+            }))),
         }
     }
 }
