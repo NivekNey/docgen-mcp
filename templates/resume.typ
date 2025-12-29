@@ -35,6 +35,210 @@
     else if end != none [#end]
   }
 
+  // === SECTION RENDERERS ===
+
+  let render-education() = {
+    if "education" in data and data.education.len() > 0 [
+      #section-header("Education")
+      #for edu in data.education [
+        #block(breakable: false)[
+          #entry-header(
+            edu.institution,
+            if "location" in edu and edu.location != none [#edu.location],
+            [#if "degree" in edu [#edu.degree]#if "fieldOfStudy" in edu [, #edu.fieldOfStudy]],
+            format-dates(
+              if "startDate" in edu { edu.startDate } else { none },
+              if "endDate" in edu { edu.endDate } else { none }
+            )
+          )
+          #if "gpa" in edu and edu.gpa != none [
+            #v(1pt)
+            GPA: #edu.gpa
+          ]
+          #if "highlights" in edu and edu.highlights.len() > 0 [
+            #v(2pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #for h in edu.highlights [
+              - #h
+            ]
+          ]
+        ]
+        #v(4pt)
+      ]
+    ]
+  }
+
+  let render-experience() = {
+    if "work" in data and data.work.len() > 0 [
+      #section-header("Experience")
+      #for w in data.work [
+        #block(breakable: false)[
+          #entry-header(
+            w.position,
+            format-dates(
+              if "startDate" in w { w.startDate } else { none },
+              if "endDate" in w { w.endDate } else { none }
+            ),
+            w.company,
+            if "location" in w and w.location != none [#w.location]
+          )
+          #if "highlights" in w and w.highlights.len() > 0 [
+            #v(2pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #for h in w.highlights [
+              - #h
+            ]
+          ]
+        ]
+        #v(4pt)
+      ]
+    ]
+  }
+
+  let render-projects() = {
+    if "projects" in data and data.projects.len() > 0 [
+      #section-header("Projects")
+      #for p in data.projects [
+        #block(breakable: false)[
+          #grid(
+            columns: (1fr, auto),
+            [
+              *#p.name*
+              #if "keywords" in p and p.keywords.len() > 0 [
+                #h(4pt) | #h(4pt) #text(style: "italic", size: 9pt)[#p.keywords.join(", ")]
+              ]
+              #if "url" in p and p.url != none [
+                #h(4pt) | #h(4pt) #link(p.url)[#underline(text(size: 9pt)[#p.url.replace("https://", "").replace("http://", "")])]
+              ]
+            ],
+            align(right)[
+              #format-dates(
+                if "startDate" in p { p.startDate } else { none },
+                if "endDate" in p { p.endDate } else { none }
+              )
+            ]
+          )
+          #if "description" in p and p.description != none [
+            #v(1pt)
+            #text(style: "italic", size: 9pt)[#p.description]
+          ]
+          #if "highlights" in p and p.highlights.len() > 0 [
+            #v(2pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #for h in p.highlights [
+              - #h
+            ]
+          ]
+        ]
+        #v(4pt)
+      ]
+    ]
+  }
+
+  let render-certifications() = {
+    if "certifications" in data and data.certifications.len() > 0 [
+      #section-header("Certifications")
+      #for cert in data.certifications [
+        #block(breakable: false)[
+          #grid(
+            columns: (1fr, auto),
+            [
+              *#cert.name*
+              #if "issuer" in cert and cert.issuer != none [
+                #h(4pt) | #h(4pt) #text(style: "italic")[#cert.issuer]
+              ]
+            ],
+            align(right)[
+              #if "date" in cert and cert.date != none [#cert.date]
+            ]
+          )
+          #if "url" in cert and cert.url != none [
+            #link(cert.url)[#underline(text(size: 9pt)[#cert.url.replace("https://", "").replace("http://", "")])]
+          ]
+        ]
+        #v(3pt)
+      ]
+    ]
+  }
+
+  let render-awards() = {
+    if "awards" in data and data.awards.len() > 0 [
+      #section-header("Awards")
+      #for award in data.awards [
+        #block(breakable: false)[
+          #grid(
+            columns: (1fr, auto),
+            [
+              *#award.title*
+              #if "awarder" in award and award.awarder != none [
+                #h(4pt) | #h(4pt) #text(style: "italic")[#award.awarder]
+              ]
+            ],
+            align(right)[
+              #if "date" in award and award.date != none [#award.date]
+            ]
+          )
+          #if "summary" in award and award.summary != none [
+            #v(1pt)
+            #text(size: 9pt)[#award.summary]
+          ]
+        ]
+        #v(3pt)
+      ]
+    ]
+  }
+
+  let render-publications() = {
+    if "publications" in data and data.publications != none [
+      #section-header("Publications")
+      #text[#data.publications]
+      #v(4pt)
+    ]
+  }
+
+  let render-skills() = {
+    if "skills" in data and data.skills.len() > 0 [
+      #section-header("Technical Skills")
+      #for skill in data.skills [
+        *#skill.name:* #skill.keywords.join(", ")
+        #linebreak()
+      ]
+    ]
+  }
+
+  let render-languages() = {
+    if "languages" in data and data.languages.len() > 0 [
+      #section-header("Languages")
+      #let lang-items = data.languages.map(lang => {
+        if "fluency" in lang and lang.fluency != none [*#lang.language* (#lang.fluency)]
+        else [*#lang.language*]
+      })
+      #lang-items.join("  •  ")
+    ]
+  }
+
+  // Section dispatcher
+  let render-section(name) = {
+    if name == "education" { render-education() }
+    else if name == "experience" { render-experience() }
+    else if name == "projects" { render-projects() }
+    else if name == "certifications" { render-certifications() }
+    else if name == "awards" { render-awards() }
+    else if name == "publications" { render-publications() }
+    else if name == "skills" { render-skills() }
+    else if name == "languages" { render-languages() }
+  }
+
+  // Default section order
+  let default-order = ("education", "experience", "projects", "certifications", "awards", "publications", "skills", "languages")
+
+  // Determine section order to use
+  let section-order = if "sectionOrder" in data and data.sectionOrder != none {
+    data.sectionOrder
+  } else {
+    default-order
+  }
+
   // === HEADER ===
   align(center)[
     #text(2em, weight: "bold", smallcaps(data.basics.name))
@@ -64,175 +268,8 @@
     #text(style: "italic")[#data.basics.summary]
   ]
 
-  // === EDUCATION ===
-  if "education" in data and data.education.len() > 0 [
-    #section-header("Education")
-    #for edu in data.education [
-      #block(breakable: false)[
-        #entry-header(
-          edu.institution,
-          if "location" in edu and edu.location != none [#edu.location],
-          [#if "degree" in edu [#edu.degree]#if "fieldOfStudy" in edu [, #edu.fieldOfStudy]],
-          format-dates(
-            if "startDate" in edu { edu.startDate } else { none },
-            if "endDate" in edu { edu.endDate } else { none }
-          )
-        )
-        #if "gpa" in edu and edu.gpa != none [
-          #v(1pt)
-          GPA: #edu.gpa
-        ]
-        #if "highlights" in edu and edu.highlights.len() > 0 [
-          #v(2pt)
-          #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
-          #for h in edu.highlights [
-            - #h
-          ]
-        ]
-      ]
-      #v(4pt)
-    ]
-  ]
-
-  // === EXPERIENCE ===
-  if "work" in data and data.work.len() > 0 [
-    #section-header("Experience")
-    #for w in data.work [
-      #block(breakable: false)[
-        #entry-header(
-          w.position,
-          format-dates(
-            if "startDate" in w { w.startDate } else { none },
-            if "endDate" in w { w.endDate } else { none }
-          ),
-          w.company,
-          if "location" in w and w.location != none [#w.location]
-        )
-        #if "highlights" in w and w.highlights.len() > 0 [
-          #v(2pt)
-          #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
-          #for h in w.highlights [
-            - #h
-          ]
-        ]
-      ]
-      #v(4pt)
-    ]
-  ]
-
-  // === PROJECTS ===
-  if "projects" in data and data.projects.len() > 0 [
-    #section-header("Projects")
-    #for p in data.projects [
-      #block(breakable: false)[
-        #grid(
-          columns: (1fr, auto),
-          [
-            *#p.name*
-            #if "keywords" in p and p.keywords.len() > 0 [
-              #h(4pt) | #h(4pt) #text(style: "italic", size: 9pt)[#p.keywords.join(", ")]
-            ]
-            #if "url" in p and p.url != none [
-              #h(4pt) | #h(4pt) #link(p.url)[#underline(text(size: 9pt)[#p.url.replace("https://", "").replace("http://", "")])]
-            ]
-          ],
-          align(right)[
-            #format-dates(
-              if "startDate" in p { p.startDate } else { none },
-              if "endDate" in p { p.endDate } else { none }
-            )
-          ]
-        )
-        #if "description" in p and p.description != none [
-          #v(1pt)
-          #text(style: "italic", size: 9pt)[#p.description]
-        ]
-        #if "highlights" in p and p.highlights.len() > 0 [
-          #v(2pt)
-          #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
-          #for h in p.highlights [
-            - #h
-          ]
-        ]
-      ]
-      #v(4pt)
-    ]
-  ]
-
-  // === CERTIFICATIONS ===
-  if "certifications" in data and data.certifications.len() > 0 [
-    #section-header("Certifications")
-    #for cert in data.certifications [
-      #block(breakable: false)[
-        #grid(
-          columns: (1fr, auto),
-          [
-            *#cert.name*
-            #if "issuer" in cert and cert.issuer != none [
-              #h(4pt) | #h(4pt) #text(style: "italic")[#cert.issuer]
-            ]
-          ],
-          align(right)[
-            #if "date" in cert and cert.date != none [#cert.date]
-          ]
-        )
-        #if "url" in cert and cert.url != none [
-          #link(cert.url)[#underline(text(size: 9pt)[#cert.url.replace("https://", "").replace("http://", "")])]
-        ]
-      ]
-      #v(3pt)
-    ]
-  ]
-
-  // === AWARDS ===
-  if "awards" in data and data.awards.len() > 0 [
-    #section-header("Awards")
-    #for award in data.awards [
-      #block(breakable: false)[
-        #grid(
-          columns: (1fr, auto),
-          [
-            *#award.title*
-            #if "awarder" in award and award.awarder != none [
-              #h(4pt) | #h(4pt) #text(style: "italic")[#award.awarder]
-            ]
-          ],
-          align(right)[
-            #if "date" in award and award.date != none [#award.date]
-          ]
-        )
-        #if "summary" in award and award.summary != none [
-          #v(1pt)
-          #text(size: 9pt)[#award.summary]
-        ]
-      ]
-      #v(3pt)
-    ]
-  ]
-
-  // === PUBLICATIONS ===
-  if "publications" in data and data.publications != none [
-    #section-header("Publications")
-    #text[#data.publications]
-    #v(4pt)
-  ]
-
-  // === SKILLS ===
-  if "skills" in data and data.skills.len() > 0 [
-    #section-header("Technical Skills")
-    #for skill in data.skills [
-      *#skill.name:* #skill.keywords.join(", ")
-      #linebreak()
-    ]
-  ]
-
-  // === LANGUAGES ===
-  if "languages" in data and data.languages.len() > 0 [
-    #section-header("Languages")
-    #let lang-items = data.languages.map(lang => {
-      if "fluency" in lang and lang.fluency != none [*#lang.language* (#lang.fluency)]
-      else [*#lang.language*]
-    })
-    #lang-items.join("  •  ")
-  ]
+  // === RENDER SECTIONS IN ORDER ===
+  for section in section-order {
+    render-section(section)
+  }
 }

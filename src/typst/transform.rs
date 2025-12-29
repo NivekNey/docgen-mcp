@@ -64,6 +64,7 @@ mod tests {
             awards: vec![],
             languages: vec![],
             publications: None,
+            section_order: None,
         };
 
         let result = transform_resume(&resume);
@@ -95,6 +96,7 @@ mod tests {
             awards: vec![],
             languages: vec![],
             publications: None,
+            section_order: None,
         };
 
         let source = transform_resume(&resume).unwrap();
@@ -105,6 +107,42 @@ mod tests {
                 println!("Diag: {:?} {}", diag.severity, diag.message);
             }
         }
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transform_with_section_order() {
+        let resume = Resume {
+            basics: Basics {
+                name: "Test User".to_string(),
+                email: "test@example.com".to_string(),
+                phone: None,
+                location: None,
+                summary: None,
+                profiles: vec![],
+            },
+            work: vec![],
+            education: vec![],
+            skills: vec![],
+            projects: vec![],
+            certifications: vec![],
+            awards: vec![],
+            languages: vec![],
+            publications: None,
+            section_order: Some(vec![
+                "experience".to_string(),
+                "education".to_string(),
+                "skills".to_string(),
+            ]),
+        };
+
+        let source = transform_resume(&resume).unwrap();
+        // Verify section order is included in the JSON
+        assert!(source.contains("sectionOrder"));
+        assert!(source.contains("experience"));
+
+        // Verify it compiles successfully
+        let result = crate::typst::compiler::compile(source);
         assert!(result.is_ok());
     }
 }

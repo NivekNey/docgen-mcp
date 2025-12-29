@@ -615,6 +615,7 @@ mod tests {
                 awards: vec![],
                 languages: vec![],
                 publications: None,
+                section_order: None,
             }),
         };
 

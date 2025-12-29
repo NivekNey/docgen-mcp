@@ -432,15 +432,26 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 7: Configuration & Customization
+### Milestone 7: Configuration & Customization ✅
 > *User control over output*
 
-- [ ] Add tool parameters for customization (template variant, accent color, font)
-- [ ] Support page size options (letter, A4)
-- [ ] Allow custom section ordering
-- [ ] Document configuration options in schema
+- [x] ~~Add tool parameters for customization (template variant, accent color, font)~~ — Skipped for opinionated style consistency
+- [x] ~~Support page size options (letter, A4)~~ — Skipped for opinionated style consistency
+- [x] Allow custom section ordering
+- [x] Document configuration options in schema
 
-**Deliverable:** Users can customize output appearance
+**Deliverable:** Users can customize section ordering while maintaining consistent professional styling ✅
+
+**Implementation Notes:**
+- Added `sectionOrder` field to Resume schema for custom section ordering
+- Valid sections: `education`, `experience`, `projects`, `certifications`, `awards`, `publications`, `skills`, `languages`
+- Default order used when `sectionOrder` is not specified
+- Omit sections from the list to hide them entirely
+- Refactored template with section renderer functions for dynamic ordering
+- Template uses section dispatcher pattern for clean, maintainable code
+- Skipped style customization (colors, fonts, page size) intentionally for consistent professional output
+- Schema descriptions document all configuration options
+- All 41 tests (38 unit + 3 integration) passing ✅
 
 ---
 

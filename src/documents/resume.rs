@@ -49,6 +49,13 @@ pub struct Resume {
         description = "Free-form text describing publications, e.g., '11 peer-reviewed publications at EMNLP, IEEE TNNLS, IEEE Big Data, ACM CIKM on text moderation, hate speech detection, ad creative optimization, and graph neural networks'"
     )]
     pub publications: Option<String>,
+
+    /// Custom section ordering
+    #[serde(rename = "sectionOrder", default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        description = "Custom section ordering. Array of section names to display in order. Valid sections: 'education', 'experience', 'projects', 'certifications', 'awards', 'publications', 'skills', 'languages'. If not specified, uses default order. Omit a section from the list to hide it."
+    )]
+    pub section_order: Option<Vec<String>>,
 }
 
 /// A project entry
@@ -320,6 +327,7 @@ mod tests {
                 fluency: Some("Native".to_string()),
             }],
             publications: Some("5 peer-reviewed publications at NeurIPS and ICML".to_string()),
+            section_order: None,
         };
 
         let json = serde_json::to_string_pretty(&resume).unwrap();
