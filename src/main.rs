@@ -2,6 +2,7 @@ use std::env;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use rmcp::{
+    ErrorData,
     ServerHandler,
     ServiceExt,
     model::*,
@@ -10,6 +11,8 @@ use rmcp::{
 mod mcp;
 mod documents;
 mod typst;
+
+use mcp::resources;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -107,7 +110,9 @@ impl ServerHandler for DocgenServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2025_03_26,
-            capabilities: ServerCapabilities::builder().build(),
+            capabilities: ServerCapabilities::builder()
+                .enable_resources()
+                .build(),
             server_info: Implementation {
                 name: "docgen-mcp".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
@@ -120,6 +125,34 @@ impl ServerHandler for DocgenServer {
                  powered by Typst. Use this server to generate professionally typeset \
                  documents like resumes and CVs.".to_string()
             ),
+        }
+    }
+
+    async fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParam>,
+        _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<ListResourcesResult, ErrorData> {
+        Ok(ListResourcesResult {
+            resources: resources::list_resources(),
+            next_cursor: None,
+            meta: None,
+        })
+    }
+
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParam,
+        _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<ReadResourceResult, ErrorData> {
+        match resources::read_resource(&request.uri) {
+            Some(contents) => Ok(ReadResourceResult {
+                contents: vec![contents],
+            }),
+            None => Err(ErrorData::resource_not_found(
+                format!("Resource not found: {}", request.uri),
+                None,
+            )),
         }
     }
 }

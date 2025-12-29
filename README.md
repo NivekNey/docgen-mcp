@@ -153,7 +153,8 @@ Example schema (simplified):
       }
     },
     "education": { "type": "array" },
-    "skills": { "type": "array" }
+    "skills": { "type": "array" },
+    "publications": { "type": "string", "description": "Free-form text describing publications" }
   }
 }
 ```
@@ -290,18 +291,27 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 1: Schema Resource
+### Milestone 1: Schema Resource ✅
 > *Define Rust types and expose generated JSON schema as an MCP resource*
 
-- [ ] Add `schemars` dependency to Cargo.toml
-- [ ] Define resume Rust types (start simple: `Basics`, `WorkExperience`, `Education`, `Skills`)
-- [ ] Derive `Deserialize`, `Serialize`, and `JsonSchema` on types
-- [ ] Generate JSON Schema at runtime using `schemars::schema_for!`
-- [ ] Implement MCP `resources/list` handler
-- [ ] Implement MCP `resources/read` handler for `docgen://schemas/resume`
-- [ ] Add tests for resource handlers and schema generation
+- [x] Add `schemars` dependency to Cargo.toml
+- [x] Define resume Rust types (start simple: `Basics`, `WorkExperience`, `Education`, `Skills`)
+- [x] Derive `Deserialize`, `Serialize`, and `JsonSchema` on types
+- [x] Generate JSON Schema at runtime using `schemars::schema_for!`
+- [x] Implement MCP `resources/list` handler
+- [x] Implement MCP `resources/read` handler for `docgen://schemas/resume`
+- [x] Add tests for resource handlers and schema generation
 
-**Deliverable:** Client can read the resume schema via MCP (generated from Rust types)
+**Deliverable:** Client can read the resume schema via MCP (generated from Rust types) ✅
+
+**Implementation Notes:**
+- Resume types defined in `src/documents/resume.rs` with full schemars annotations
+- Types include: `Resume`, `Basics`, `Profile`, `WorkExperience`, `Education`, `Skill`
+- Free-form `publications` field for flexible publication summaries
+- Resources capability enabled via `ServerCapabilities::builder().enable_resources()`
+- Schema exposed at `docgen://schemas/resume` URI
+- Sample fixture added at `tests/fixtures/sample_resume.json`
+- 10 tests covering serialization, deserialization, schema generation, and resource handlers
 
 ---
 

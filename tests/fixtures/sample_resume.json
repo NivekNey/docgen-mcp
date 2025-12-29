@@ -1,0 +1,70 @@
+{
+  "basics": {
+    "name": "Jane Smith",
+    "email": "jane.smith@example.com",
+    "phone": "+1-555-123-4567",
+    "location": "San Francisco, CA",
+    "summary": "Experienced software engineer with 8+ years building scalable web applications. Passionate about clean code, mentoring, and developer experience.",
+    "profiles": [
+      {
+        "network": "LinkedIn",
+        "url": "https://linkedin.com/in/janesmith"
+      },
+      {
+        "network": "GitHub",
+        "url": "https://github.com/janesmith"
+      }
+    ]
+  },
+  "work": [
+    {
+      "company": "Tech Innovations Inc.",
+      "position": "Senior Software Engineer",
+      "startDate": "2020-03",
+      "endDate": "Present",
+      "highlights": [
+        "Led migration of monolithic application to microservices architecture",
+        "Reduced API response times by 60% through caching and query optimization",
+        "Mentored team of 4 junior developers"
+      ]
+    },
+    {
+      "company": "StartupXYZ",
+      "position": "Software Engineer",
+      "startDate": "2016-06",
+      "endDate": "2020-02",
+      "highlights": [
+        "Built real-time data processing pipeline handling 1M+ events/day",
+        "Implemented CI/CD pipelines reducing deployment time by 75%"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of California, Berkeley",
+      "degree": "B.S.",
+      "fieldOfStudy": "Computer Science",
+      "startDate": "2012-08",
+      "endDate": "2016-05",
+      "gpa": "3.8",
+      "highlights": [
+        "Dean's List 2014-2016",
+        "Teaching Assistant for Data Structures"
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "name": "Programming Languages",
+      "keywords": ["Rust", "Python", "TypeScript", "Go"]
+    },
+    {
+      "name": "Frameworks & Tools",
+      "keywords": ["React", "Node.js", "PostgreSQL", "Docker", "Kubernetes"]
+    },
+    {
+      "name": "Cloud Platforms",
+      "keywords": ["AWS", "GCP"]
+    }
+  ]
+}
