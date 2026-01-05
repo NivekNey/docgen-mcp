@@ -190,6 +190,47 @@ Example schema (simplified):
 4. Call `validate_resume` to check the structure
 5. Call `generate_resume` to create the PDF file
 
+### Notifications
+
+This server supports MCP list change notifications, allowing clients to be notified when available tools, resources, or prompts change.
+
+**Supported Notifications:**
+- `notifications/tools/list_changed` - Sent when tools are added, removed, or modified
+- `notifications/resources/list_changed` - Sent when resources are added, removed, or modified
+- `notifications/prompts/list_changed` - Sent when prompts are added, removed, or modified
+
+**Capability Declaration:**
+
+The server declares support for these notifications in its capabilities:
+
+```json
+{
+  "capabilities": {
+    "tools": { "listChanged": true },
+    "resources": { "listChanged": true },
+    "prompts": { "listChanged": true }
+  }
+}
+```
+
+**Client Behavior:**
+
+When a client receives a list change notification, it should:
+1. Re-fetch the corresponding list using `tools/list`, `resources/list`, or `prompts/list`
+2. Update its internal cache with the new capabilities
+3. Optionally notify the user about new functionality
+
+**Current Implementation:**
+
+This server currently has static tools, resources, and prompts that don't change at runtime. However, the notification infrastructure is in place for future enhancements such as:
+- Hot-reloading document templates
+- Dynamic plugin loading
+- User-defined custom document types
+
+**For Developers:**
+
+See `src/mcp/notifications.rs` for helper functions to send notifications, and `examples/notifications_example.rs` for a complete example of implementing dynamic capability updates.
+
 ## Project Structure
 
 ```
@@ -199,6 +240,7 @@ docgen-mcp/
 │   ├── main.rs              # Entry point, MCP server setup (HTTP/SSE + stdio)
 │   ├── mcp/
 │   │   ├── mod.rs
+│   │   ├── notifications.rs # List change notification helpers
 │   │   ├── resources.rs     # Schema resource handlers (serves generated schemas)
 │   │   ├── prompts.rs       # Best practices prompts
 │   │   └── tools.rs         # Generate/validate tool handlers
@@ -212,6 +254,8 @@ docgen-mcp/
 │   │   └── transform.rs     # Rust types → Typst markup codegen
 ├── templates/
 │   └── resume.typ           # Typst template (embedded at compile time)
+├── examples/
+│   └── notifications_example.rs  # Example of dynamic capability updates
 └── tests/
     ├── integration.rs
     └── fixtures/

@@ -110,8 +110,11 @@ impl ServerHandler for DocgenServer {
             protocol_version: ProtocolVersion::V_2025_03_26,
             capabilities: ServerCapabilities::builder()
                 .enable_prompts()
+                .enable_prompts_list_changed()
                 .enable_resources()
+                .enable_resources_list_changed()
                 .enable_tools()
+                .enable_tool_list_changed()
                 .build(),
             server_info: Implementation {
                 name: "docgen-mcp".to_string(),
@@ -133,7 +136,13 @@ impl ServerHandler for DocgenServer {
                  Following this workflow ensures high-quality, properly structured documents.\n\n\
                  ALTERNATIVE: Advanced agents can also use:\n\
                  - PROMPT 'resume-best-practices' for comprehensive guidance\n\
-                 - RESOURCE 'docgen://schemas/resume' for schema definition"
+                 - RESOURCE 'docgen://schemas/resume' for schema definition\n\n\
+                 NOTIFICATIONS:\n\
+                 This server supports list change notifications. Clients will be notified when:\n\
+                 - Available tools change (notifications/tools/list_changed)\n\
+                 - Available resources change (notifications/resources/list_changed)\n\
+                 - Available prompts change (notifications/prompts/list_changed)\n\
+                 When you receive these notifications, re-fetch the corresponding list to get updates."
                     .to_string(),
             ),
         }
