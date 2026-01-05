@@ -634,6 +634,7 @@ dependencies = [
  "typst",
  "typst-assets",
  "typst-pdf",
+ "uuid",
 ]
 
 [[package]]
@@ -2552,7 +2553,9 @@ dependencies = [
  "base64",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",
@@ -4105,6 +4108,7 @@ checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
  "getrandom 0.3.4",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 

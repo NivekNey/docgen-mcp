@@ -5,9 +5,11 @@ use tracing_subscriber::FmtSubscriber;
 
 mod documents;
 mod mcp;
+mod storage;
 mod typst;
 
 use mcp::{prompts, resources, tools};
+use storage::FileStorage;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,8 +42,8 @@ async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting MCP server with stdio transport (Claude Desktop mode)");
 
-    // Create the server handler
-    let server = DocgenServer::new();
+    // Create the server handler (no file storage or base URL for stdio mode)
+    let server = DocgenServer::new(None, None);
 
     // Create stdio transport
     let transport = AsyncRwTransport::new(stdin(), stdout());
@@ -53,11 +55,17 @@ async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
-    use axum::Router;
+    use axum::{
+        Router,
+        extract::{Path, State},
+        http::{StatusCode, header},
+        response::{IntoResponse, Response},
+    };
     use rmcp::transport::streamable_http_server::{
         StreamableHttpService, session::local::LocalSessionManager,
     };
     use std::net::SocketAddr;
+    use uuid::Uuid;
 
     // Get port from environment or use default
     let port = env::var("PORT")
@@ -67,22 +75,74 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
+    // Determine base URL for download links
+    // Use BASE_URL env var if set (for production), otherwise construct from port
+    let base_url = env::var("BASE_URL").unwrap_or_else(|_| {
+        format!("http://localhost:{}", port)
+    });
+
     info!(
         "Starting MCP server with Streamable HTTP transport on {}",
         addr
     );
+    info!("Download URL base: {}", base_url);
 
-    // Create the streamable HTTP service
+    // Create file storage and start cleanup task
+    let file_storage = FileStorage::new();
+    file_storage.clone().start_cleanup_task();
+
+    // Create the streamable HTTP service with storage
+    let storage_clone = file_storage.clone();
+    let base_url_clone = base_url.clone();
     let service = StreamableHttpService::new(
-        || Ok(DocgenServer::new()),
+        move || Ok(DocgenServer::new(Some(storage_clone.clone()), Some(base_url_clone.clone()))),
         LocalSessionManager::default().into(),
         Default::default(),
     );
 
-    // Create axum router with MCP endpoint
-    let app = Router::new().nest_service("/mcp", service);
+    // File download handler
+    async fn download_file(
+        State(storage): State<FileStorage>,
+        Path(file_id): Path<String>,
+    ) -> Response {
+        // Parse UUID
+        let id = match Uuid::parse_str(&file_id) {
+            Ok(id) => id,
+            Err(_) => {
+                return (StatusCode::BAD_REQUEST, "Invalid file ID").into_response();
+            }
+        };
+
+        // Retrieve file
+        match storage.retrieve(&id).await {
+            Some(file) => {
+                // Return the PDF with appropriate headers
+                (
+                    StatusCode::OK,
+                    [
+                        (header::CONTENT_TYPE, "application/pdf"),
+                        (
+                            header::CONTENT_DISPOSITION,
+                            &format!("attachment; filename=\"{}\"", file.filename),
+                        ),
+                        (header::CACHE_CONTROL, "no-store, must-revalidate"),
+                    ],
+                    file.data,
+                )
+                    .into_response()
+            }
+            None => (StatusCode::NOT_FOUND, "File not found or expired").into_response(),
+        }
+    }
+
+    // Create axum router with MCP endpoint and file downloads
+    let app = Router::new()
+        .nest_service("/mcp", service)
+        .route("/files/{id}", axum::routing::get(download_file))
+        .with_state(file_storage);
 
     info!("MCP server listening on {} (endpoint: /mcp)", addr);
+    info!("File download endpoint: /files/:id");
 
     // Start the server
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -96,11 +156,19 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // The main server handler
-struct DocgenServer;
+struct DocgenServer {
+    /// Optional file storage for HTTP mode
+    file_storage: Option<FileStorage>,
+    /// Base URL for HTTP mode (for generating download links)
+    base_url: Option<String>,
+}
 
 impl DocgenServer {
-    fn new() -> Self {
-        Self
+    fn new(file_storage: Option<FileStorage>, base_url: Option<String>) -> Self {
+        Self {
+            file_storage,
+            base_url,
+        }
     }
 }
 
@@ -213,7 +281,14 @@ impl ServerHandler for DocgenServer {
         // Convert Map<String, Value> to Value::Object
         let arguments = serde_json::Value::Object(request.arguments.unwrap_or_default());
 
-        match tools::call_tool(&request.name, arguments) {
+        // Create tool context based on transport mode
+        let tool_context = if let (Some(storage), Some(base_url)) = (&self.file_storage, &self.base_url) {
+            tools::ToolContext::http(storage.clone(), base_url.clone())
+        } else {
+            tools::ToolContext::stdio()
+        };
+
+        match tools::call_tool(&request.name, arguments, &tool_context).await {
             Ok(result) => Ok(CallToolResult::structured(result)),
             Err(e) => Ok(CallToolResult::structured_error(serde_json::json!({
                 "error": e
