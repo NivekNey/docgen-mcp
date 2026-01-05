@@ -195,13 +195,13 @@ pub fn get_resume_best_practices() -> Value {
     match prompts::get_prompt(prompts::RESUME_BEST_PRACTICES_PROMPT) {
         Some(prompt_result) => {
             // Extract the text content from the prompt message
-            if let Some(msg) = prompt_result.messages.first() {
-                if let rmcp::model::PromptMessageContent::Text { text } = &msg.content {
-                    return serde_json::json!({
-                        "best_practices": text,
-                        "description": prompt_result.description
-                    });
-                }
+            if let Some(msg) = prompt_result.messages.first()
+                && let rmcp::model::PromptMessageContent::Text { text } = &msg.content
+            {
+                return serde_json::json!({
+                    "best_practices": text,
+                    "description": prompt_result.description
+                });
             }
             serde_json::json!({
                 "error": "Failed to extract prompt content"
