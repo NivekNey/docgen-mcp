@@ -7,7 +7,6 @@
 //! - `validate_resume` - Validates JSON payload against resume schema
 //! - `generate_resume` - Generates a PDF from a resume JSON payload
 
-use base64::{Engine as _, engine::general_purpose};
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,6 +15,7 @@ use std::sync::Arc;
 
 use crate::documents::Resume;
 use crate::mcp::{prompts, resources};
+use crate::storage::FileStorage;
 use crate::typst::compiler::compile;
 use crate::typst::transform::transform_resume;
 
@@ -30,6 +30,32 @@ pub const VALIDATE_RESUME_TOOL: &str = "validate_resume";
 
 /// Tool name for resume generation
 pub const GENERATE_RESUME_TOOL: &str = "generate_resume";
+
+/// Context for tool execution (passed from server)
+pub struct ToolContext {
+    /// File storage for remote PDF delivery (HTTP mode only)
+    pub file_storage: Option<FileStorage>,
+    /// Base URL for generating download links (HTTP mode only)
+    pub base_url: Option<String>,
+}
+
+impl ToolContext {
+    /// Create a new context for stdio mode (no file storage)
+    pub fn stdio() -> Self {
+        Self {
+            file_storage: None,
+            base_url: None,
+        }
+    }
+
+    /// Create a new context for HTTP mode with file storage
+    pub fn http(file_storage: FileStorage, base_url: String) -> Self {
+        Self {
+            file_storage: Some(file_storage),
+            base_url: Some(base_url),
+        }
+    }
+}
 
 /// Result of a validation operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,10 +82,12 @@ pub enum GenerationResult {
     /// Generation succeeded
     #[serde(rename = "success")]
     Success {
-        /// Path to the generated PDF file (useful for local/stdio mode)
-        file_path: String,
-        /// Base64-encoded PDF content (useful for remote/HTTP mode)
-        pdf_content: String,
+        /// Path to the generated PDF file (for local/stdio mode) or null (for HTTP mode)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        file_path: Option<String>,
+        /// Download URL for the PDF (for remote/HTTP mode) or null (for stdio mode)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        download_url: Option<String>,
         /// Human-readable success message
         message: String,
     },
@@ -264,8 +292,11 @@ pub fn validate_resume(input: Value) -> ValidationResult {
     }
 }
 
-/// Generates a PDF resume from a JSON payload and saves it to a file
-pub fn generate_resume(input: Value) -> GenerationResult {
+/// Generates a PDF resume from a JSON payload
+///
+/// In stdio mode: saves the PDF to a local file
+/// In HTTP mode: stores the PDF in temporary storage and returns a download URL
+pub async fn generate_resume(input: Value, context: &ToolContext) -> GenerationResult {
     // 0. Parse input to get resume and optional filename
     let parsed_input: GenerateResumeInput = match serde_json::from_value(input.clone()) {
         Ok(v) => v,
@@ -332,20 +363,37 @@ pub fn generate_resume(input: Value) -> GenerationResult {
         format!("{}-resume.pdf", sanitized)
     });
 
-    // 5. Encode PDF as base64 (for remote MCP usage)
-    let pdf_base64 = general_purpose::STANDARD.encode(&pdf_bytes);
+    // 5. Handle output based on transport mode
+    match (&context.file_storage, &context.base_url) {
+        // HTTP mode: store in temporary storage and return download URL
+        (Some(storage), Some(base_url)) => {
+            let file_id = storage.store(pdf_bytes, filename.clone()).await;
+            let download_url = format!("{}/files/{}", base_url, file_id);
 
-    // 6. Save to file (for local/stdio usage)
-    match fs::write(&filename, pdf_bytes) {
-        Ok(_) => GenerationResult::Success {
-            file_path: filename.clone(),
-            pdf_content: pdf_base64,
-            message: format!("Resume successfully generated and saved to '{}'", filename),
-        },
-        Err(e) => GenerationResult::Error {
-            message: format!("Failed to write PDF to file '{}': {}", filename, e),
-            validation_errors: None,
-        },
+            GenerationResult::Success {
+                file_path: None,
+                download_url: Some(download_url.clone()),
+                message: format!(
+                    "Resume successfully generated. Download it from: {}\n\
+                     This link will expire in 1 hour.",
+                    download_url
+                ),
+            }
+        }
+        // Stdio mode: save to local file
+        _ => {
+            match fs::write(&filename, pdf_bytes) {
+                Ok(_) => GenerationResult::Success {
+                    file_path: Some(filename.clone()),
+                    download_url: None,
+                    message: format!("Resume successfully generated and saved to '{}'", filename),
+                },
+                Err(e) => GenerationResult::Error {
+                    message: format!("Failed to write PDF to file '{}': {}", filename, e),
+                    validation_errors: None,
+                },
+            }
+        }
     }
 }
 
@@ -444,7 +492,7 @@ fn infer_path_from_context(message: &str, field: &str) -> String {
 }
 
 /// Execute a tool by name with the given arguments
-pub fn call_tool(name: &str, arguments: Value) -> Result<Value, String> {
+pub async fn call_tool(name: &str, arguments: Value, context: &ToolContext) -> Result<Value, String> {
     match name {
         GET_RESUME_SCHEMA_TOOL => {
             let _ = arguments; // Schema tool takes no arguments
@@ -459,7 +507,7 @@ pub fn call_tool(name: &str, arguments: Value) -> Result<Value, String> {
             serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
         }
         GENERATE_RESUME_TOOL => {
-            let result = generate_resume(arguments);
+            let result = generate_resume(arguments, context).await;
             serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
         }
         _ => Err(format!("Unknown tool: {}", name)),
@@ -517,9 +565,10 @@ mod tests {
         assert!(best_practices.contains("schema"));
     }
 
-    #[test]
-    fn test_call_tool_get_schema() {
-        let result = call_tool(GET_RESUME_SCHEMA_TOOL, serde_json::json!({}));
+    #[tokio::test]
+    async fn test_call_tool_get_schema() {
+        let context = ToolContext::stdio();
+        let result = call_tool(GET_RESUME_SCHEMA_TOOL, serde_json::json!({}), &context).await;
         assert!(result.is_ok());
 
         let value = result.unwrap();
@@ -527,9 +576,10 @@ mod tests {
         assert!(value.get("$schema").is_some());
     }
 
-    #[test]
-    fn test_call_tool_get_best_practices() {
-        let result = call_tool(GET_RESUME_BEST_PRACTICES_TOOL, serde_json::json!({}));
+    #[tokio::test]
+    async fn test_call_tool_get_best_practices() {
+        let context = ToolContext::stdio();
+        let result = call_tool(GET_RESUME_BEST_PRACTICES_TOOL, serde_json::json!({}), &context).await;
         assert!(result.is_ok());
 
         let value = result.unwrap();
@@ -779,8 +829,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_call_tool_validate_resume() {
+    #[tokio::test]
+    async fn test_call_tool_validate_resume() {
+        let context = ToolContext::stdio();
         let input = serde_json::json!({
             "resume": {
                 "basics": {
@@ -791,16 +842,17 @@ mod tests {
             }
         });
 
-        let result = call_tool(VALIDATE_RESUME_TOOL, input);
+        let result = call_tool(VALIDATE_RESUME_TOOL, input, &context).await;
         assert!(result.is_ok());
 
         let value = result.unwrap();
         assert_eq!(value["status"], "valid");
     }
 
-    #[test]
-    fn test_call_tool_unknown() {
-        let result = call_tool("unknown_tool", serde_json::json!({}));
+    #[tokio::test]
+    async fn test_call_tool_unknown() {
+        let context = ToolContext::stdio();
+        let result = call_tool("unknown_tool", serde_json::json!({}), &context).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Unknown tool"));
     }
@@ -960,8 +1012,9 @@ mod tests {
     }
 
     // New tests for generation
-    #[test]
-    fn test_generate_resume_valid() {
+    #[tokio::test]
+    async fn test_generate_resume_valid() {
+        let context = ToolContext::stdio();
         let input = serde_json::json!({
             "resume": {
                 "basics": {
@@ -974,22 +1027,19 @@ mod tests {
         });
 
         // This is a slow test because it compiles PDF
-        let result = generate_resume(input);
+        let result = generate_resume(input, &context).await;
 
         match result {
-            GenerationResult::Success { file_path, pdf_content, message } => {
-                assert_eq!(file_path, "test-generate-resume-valid.pdf");
+            GenerationResult::Success { file_path, download_url, message } => {
+                assert_eq!(file_path, Some("test-generate-resume-valid.pdf".to_string()));
+                assert_eq!(download_url, None); // stdio mode doesn't have download URL
                 assert!(message.contains("successfully"));
 
-                // Verify base64 content is present and valid
-                assert!(!pdf_content.is_empty());
-                assert!(general_purpose::STANDARD.decode(&pdf_content).is_ok());
-
                 // Verify file was created
-                assert!(std::path::Path::new(&file_path).exists());
+                assert!(std::path::Path::new("test-generate-resume-valid.pdf").exists());
 
                 // Clean up
-                let _ = fs::remove_file(&file_path);
+                let _ = fs::remove_file("test-generate-resume-valid.pdf");
             }
             GenerationResult::Error { message, .. } => {
                 panic!("Expected success, got error: {}", message);
@@ -997,8 +1047,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_generate_resume_invalid() {
+    #[tokio::test]
+    async fn test_generate_resume_invalid() {
+        let context = ToolContext::stdio();
         let input = serde_json::json!({
             "resume": {
                 "basics": {
@@ -1009,7 +1060,7 @@ mod tests {
             }
         });
 
-        let result = generate_resume(input);
+        let result = generate_resume(input, &context).await;
 
         match result {
             GenerationResult::Error {
@@ -1025,8 +1076,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_call_tool_generate_resume() {
+    #[tokio::test]
+    async fn test_call_tool_generate_resume() {
+        let context = ToolContext::stdio();
         let input = serde_json::json!({
             "resume": {
                 "basics": {
@@ -1038,20 +1090,17 @@ mod tests {
             "filename": "test-call-tool-generate.pdf"
         });
 
-        let result = call_tool(GENERATE_RESUME_TOOL, input);
+        let result = call_tool(GENERATE_RESUME_TOOL, input, &context).await;
         assert!(result.is_ok());
 
         let value = result.unwrap();
         assert_eq!(value["status"], "success");
         assert!(value.get("file_path").is_some());
-        assert!(value.get("pdf_content").is_some());
         assert!(value.get("message").is_some());
 
-        // Verify pdf_content is valid base64
-        if let Some(pdf_content) = value["pdf_content"].as_str() {
-            assert!(!pdf_content.is_empty());
-            assert!(general_purpose::STANDARD.decode(pdf_content).is_ok());
-        }
+        // In stdio mode, should have file_path but no download_url
+        assert!(value["file_path"].is_string());
+        assert!(value["download_url"].is_null());
 
         // Clean up generated file
         if let Some(file_path) = value["file_path"].as_str() {
@@ -1059,8 +1108,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_generate_resume_with_custom_filename() {
+    #[tokio::test]
+    async fn test_generate_resume_with_custom_filename() {
+        let context = ToolContext::stdio();
         let input = serde_json::json!({
             "resume": {
                 "basics": {
@@ -1072,19 +1122,19 @@ mod tests {
             "filename": "custom-resume.pdf"
         });
 
-        let result = generate_resume(input);
+        let result = generate_resume(input, &context).await;
 
         match result {
-            GenerationResult::Success { file_path, pdf_content, message } => {
-                assert_eq!(file_path, "custom-resume.pdf");
+            GenerationResult::Success { file_path, download_url, message } => {
+                assert_eq!(file_path, Some("custom-resume.pdf".to_string()));
                 assert!(message.contains("custom-resume.pdf"));
-                assert!(!pdf_content.is_empty());
+                assert_eq!(download_url, None); // stdio mode
 
                 // Verify file was created
-                assert!(std::path::Path::new(&file_path).exists());
+                assert!(std::path::Path::new("custom-resume.pdf").exists());
 
                 // Clean up
-                let _ = fs::remove_file(&file_path);
+                let _ = fs::remove_file("custom-resume.pdf");
             }
             GenerationResult::Error { message, .. } => {
                 panic!("Expected success, got error: {}", message);
@@ -1092,8 +1142,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_generate_resume_default_filename() {
+    #[tokio::test]
+    async fn test_generate_resume_default_filename() {
+        let context = ToolContext::stdio();
         let input = serde_json::json!({
             "resume": {
                 "basics": {
@@ -1104,16 +1155,16 @@ mod tests {
             }
         });
 
-        let result = generate_resume(input);
+        let result = generate_resume(input, &context).await;
 
         match result {
-            GenerationResult::Success { file_path, pdf_content, .. } => {
+            GenerationResult::Success { file_path, download_url, .. } => {
                 // Should generate filename from name
-                assert_eq!(file_path, "alice-wonder-resume.pdf");
-                assert!(!pdf_content.is_empty());
+                assert_eq!(file_path, Some("alice-wonder-resume.pdf".to_string()));
+                assert_eq!(download_url, None); // stdio mode
 
                 // Clean up
-                let _ = fs::remove_file(&file_path);
+                let _ = fs::remove_file("alice-wonder-resume.pdf");
             }
             GenerationResult::Error { message, .. } => {
                 panic!("Expected success, got error: {}", message);
