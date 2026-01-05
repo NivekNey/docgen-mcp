@@ -93,7 +93,10 @@ impl ValidationError {
 /// Returns a list of all available tools
 pub fn list_tools() -> Vec<Tool> {
     // Empty schema for tools that don't take parameters
-    let empty_schema = Arc::new(serde_json::Map::new());
+    let mut empty_schema_map = serde_json::Map::new();
+    empty_schema_map.insert("type".to_string(), Value::String("object".to_string()));
+    empty_schema_map.insert("properties".to_string(), Value::Object(serde_json::Map::new()));
+    let empty_schema = Arc::new(empty_schema_map);
 
     // Schema for validate_resume (resume only)
     let mut resume_prop = serde_json::Map::new();
