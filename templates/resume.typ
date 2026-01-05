@@ -8,11 +8,11 @@
 
   // Helper for section headers
   let section-header(title) = {
-    v(6pt)
+    v(8pt)
     text(size: 12pt, weight: "bold", smallcaps(title))
-    v(-8pt)
-    line(length: 100%, stroke: 0.5pt)
     v(2pt)
+    line(length: 100%, stroke: 0.5pt)
+    v(4pt)
   }
 
   // Helper for entry headers (4-quadrant layout)
@@ -20,7 +20,7 @@
     grid(
       columns: (1fr, auto),
       rows: (auto, auto),
-      gutter: 0pt,
+      gutter: 3pt,
       text(weight: "bold")[#top-left],
       align(right)[#top-right],
       text(style: "italic")[#bottom-left],
@@ -52,18 +52,18 @@
             )
           )
           #if "gpa" in edu and edu.gpa != none [
-            #v(1pt)
+            #v(3pt)
             GPA: #edu.gpa
           ]
           #if "highlights" in edu and edu.highlights.len() > 0 [
-            #v(2pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #v(4pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in edu.highlights [
               - #h
             ]
           ]
         ]
-        #v(4pt)
+        #v(6pt)
       ]
     ]
   }
@@ -83,14 +83,14 @@
             if "location" in w and w.location != none [#w.location]
           )
           #if "highlights" in w and w.highlights.len() > 0 [
-            #v(2pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #v(4pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in w.highlights [
               - #h
             ]
           ]
         ]
-        #v(4pt)
+        #v(6pt)
       ]
     ]
   }
@@ -119,18 +119,18 @@
             ]
           )
           #if "description" in p and p.description != none [
-            #v(1pt)
+            #v(3pt)
             #text(style: "italic", size: 9pt)[#p.description]
           ]
           #if "highlights" in p and p.highlights.len() > 0 [
-            #v(2pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #v(4pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in p.highlights [
               - #h
             ]
           ]
         ]
-        #v(4pt)
+        #v(6pt)
       ]
     ]
   }
@@ -153,10 +153,11 @@
             ]
           )
           #if "url" in cert and cert.url != none [
+            #v(2pt)
             #link(cert.url)[#underline(text(size: 9pt)[#cert.url.replace("https://", "").replace("http://", "")])]
           ]
         ]
-        #v(3pt)
+        #v(5pt)
       ]
     ]
   }
@@ -179,11 +180,11 @@
             ]
           )
           #if "summary" in award and award.summary != none [
-            #v(1pt)
+            #v(3pt)
             #text(size: 9pt)[#award.summary]
           ]
         ]
-        #v(3pt)
+        #v(5pt)
       ]
     ]
   }
@@ -242,12 +243,12 @@
   // === HEADER ===
   align(center)[
     #text(2em, weight: "bold", smallcaps(data.basics.name))
-    #v(-4pt)
+    #v(2pt)
 
     // Location line (if present)
     #if "location" in data.basics and data.basics.location != none [
       #text(size: 10pt)[#data.basics.location]
-      #v(-2pt)
+      #v(2pt)
     ]
 
     // Contact line
