@@ -76,15 +76,52 @@ async fn test_http_server_starts() {
         .expect("Failed to start HTTP server");
 
     // Give server time to start
-    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
-    // Try to connect to the server
-    let client = reqwest::Client::new();
-    let response = client.get("http://localhost:3001/mcp").send().await;
+    // Verify server is still running
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            panic!("Server exited prematurely with status: {}", status);
+        }
+        Ok(None) => {
+            // Server is running, continue
+        }
+        Err(e) => {
+            panic!("Error checking server status: {}", e);
+        }
+    }
 
-    // The endpoint should be accessible (even if it returns an error about missing headers)
-    assert!(response.is_ok(), "HTTP server should be reachable");
+    // Try to connect to the server with retries
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("Failed to create HTTP client");
 
-    // Clean up
+    let mut last_error = None;
+    for attempt in 1..=5 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        match client.get("http://localhost:3001/mcp").send().await {
+            Ok(_response) => {
+                // Connection successful, server is reachable
+                child.kill().await.expect("Failed to kill HTTP server");
+                return;
+            }
+            Err(e) => {
+                last_error = Some(e);
+                if attempt < 5 {
+                    continue;
+                }
+            }
+        }
+    }
+
+    // If we got here, all attempts failed
     child.kill().await.expect("Failed to kill HTTP server");
+
+    if let Some(err) = last_error {
+        panic!("HTTP server not reachable after 5 attempts: {}", err);
+    } else {
+        panic!("HTTP server not reachable after 5 attempts");
+    }
 }

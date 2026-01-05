@@ -138,7 +138,7 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
     // Create axum router with MCP endpoint and file downloads
     let app = Router::new()
         .nest_service("/mcp", service)
-        .route("/files/:id", axum::routing::get(download_file))
+        .route("/files/{id}", axum::routing::get(download_file))
         .with_state(file_storage);
 
     info!("MCP server listening on {} (endpoint: /mcp)", addr);

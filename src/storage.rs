@@ -21,7 +21,8 @@ const CLEANUP_INTERVAL: Duration = Duration::from_secs(300);
 pub struct StoredFile {
     /// The PDF file content
     pub data: Vec<u8>,
-    /// When the file was created
+    /// When the file was created (for future logging/debugging)
+    #[allow(dead_code)]
     pub created_at: SystemTime,
     /// When the file expires
     pub expires_at: SystemTime,
