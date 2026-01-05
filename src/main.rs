@@ -53,10 +53,8 @@ async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
-    use axum::{Router, Json, response::IntoResponse, http::StatusCode};
-    use axum::http::{HeaderName, HeaderValue, Method, Request};
-    use axum::middleware::{self, Next};
-    use axum::body::Body;
+    use axum::Router;
+    use axum::http::{HeaderName, HeaderValue, Method};
     use rmcp::transport::streamable_http_server::{
         StreamableHttpService, session::local::LocalSessionManager,
     };
@@ -102,44 +100,12 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .allow_credentials(true);
 
-    // Middleware to log all incoming requests
-    async fn log_request_middleware(
-        req: Request<Body>,
-        next: Next,
-    ) -> impl IntoResponse {
-        let method = req.method().clone();
-        let uri = req.uri().clone();
-        let headers = req.headers().clone();
-
-        info!(
-            "Incoming request: {} {} | Headers: {:?}",
-            method, uri, headers
-        );
-
-        next.run(req).await
-    }
-
-    // Handler for OAuth discovery endpoint (indicates OAuth not supported)
-    async fn oauth_discovery_handler() -> impl IntoResponse {
-        info!("OAuth discovery endpoint called - returning 404 (OAuth not supported)");
-        (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({
-                "error": "OAuth not supported",
-                "message": "This MCP server does not require authentication"
-            }))
-        )
-    }
-
-    // Create axum router with MCP endpoint, OAuth discovery, and CORS
+    // Create axum router with MCP endpoint and CORS
     let app = Router::new()
         .nest_service("/mcp", service)
-        .route("/.well-known/oauth-authorization-server", axum::routing::get(oauth_discovery_handler))
-        .layer(middleware::from_fn(log_request_middleware))
         .layer(cors);
 
     info!("MCP server listening on {} (endpoint: /mcp)", addr);
-    info!("OAuth discovery endpoint: /.well-known/oauth-authorization-server (returns 404)");
 
     // Start the server
     let listener = tokio::net::TcpListener::bind(addr).await?;
