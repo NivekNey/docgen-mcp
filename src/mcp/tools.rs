@@ -2,18 +2,27 @@
 //!
 //! This module provides MCP tools for validating and generating documents.
 //! Currently implements:
+//! - `get_resume_schema` - Returns the JSON schema for resume structure
+//! - `get_resume_best_practices` - Returns best practices for resume writing
 //! - `validate_resume` - Validates JSON payload against resume schema
 //! - `generate_resume` - Generates a PDF from a resume JSON payload
 
-use base64::{Engine as _, engine::general_purpose};
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fs;
 use std::sync::Arc;
 
 use crate::documents::Resume;
+use crate::mcp::{prompts, resources};
 use crate::typst::compiler::compile;
 use crate::typst::transform::transform_resume;
+
+/// Tool name for getting resume schema
+pub const GET_RESUME_SCHEMA_TOOL: &str = "get_resume_schema";
+
+/// Tool name for getting resume best practices
+pub const GET_RESUME_BEST_PRACTICES_TOOL: &str = "get_resume_best_practices";
 
 /// Tool name for resume validation
 pub const VALIDATE_RESUME_TOOL: &str = "validate_resume";
@@ -46,8 +55,10 @@ pub enum GenerationResult {
     /// Generation succeeded
     #[serde(rename = "success")]
     Success {
-        /// Base64-encoded PDF data
-        pdf_base64: String,
+        /// Path to the generated PDF file
+        file_path: String,
+        /// Human-readable success message
+        message: String,
     },
     /// Generation failed (validation or compilation error)
     #[serde(rename = "error")]
@@ -81,46 +92,138 @@ impl ValidationError {
 
 /// Returns a list of all available tools
 pub fn list_tools() -> Vec<Tool> {
-    // Shared schema for resume input
+    // Empty schema for tools that don't take parameters
+    let empty_schema = Arc::new(serde_json::Map::new());
+
+    // Schema for validate_resume (resume only)
     let mut resume_prop = serde_json::Map::new();
     resume_prop.insert("type".to_string(), Value::String("object".to_string()));
     resume_prop.insert(
         "description".to_string(),
-        Value::String("The resume JSON payload. Use resources/read on 'docgen://schemas/resume' to get the full schema.".to_string()),
+        Value::String("The resume JSON payload. Use 'get_resume_schema' tool to see the full schema structure.".to_string()),
     );
 
-    let mut properties = serde_json::Map::new();
-    properties.insert("resume".to_string(), Value::Object(resume_prop.clone()));
+    let mut validate_properties = serde_json::Map::new();
+    validate_properties.insert("resume".to_string(), Value::Object(resume_prop.clone()));
 
-    let mut schema = serde_json::Map::new();
-    schema.insert("type".to_string(), Value::String("object".to_string()));
-    schema.insert("properties".to_string(), Value::Object(properties));
-    schema.insert(
+    let mut validate_schema = serde_json::Map::new();
+    validate_schema.insert("type".to_string(), Value::String("object".to_string()));
+    validate_schema.insert("properties".to_string(), Value::Object(validate_properties));
+    validate_schema.insert(
         "required".to_string(),
         Value::Array(vec![Value::String("resume".to_string())]),
     );
 
-    let schema_arc = Arc::new(schema);
+    let validate_schema_arc = Arc::new(validate_schema);
 
+    // Schema for generate_resume (resume + optional filename)
+    let mut filename_prop = serde_json::Map::new();
+    filename_prop.insert("type".to_string(), Value::String("string".to_string()));
+    filename_prop.insert(
+        "description".to_string(),
+        Value::String("Optional filename for the generated PDF (e.g., 'john-doe-resume.pdf'). If not provided, a default name will be generated based on the resume name.".to_string()),
+    );
+
+    let mut generate_properties = serde_json::Map::new();
+    generate_properties.insert("resume".to_string(), Value::Object(resume_prop));
+    generate_properties.insert("filename".to_string(), Value::Object(filename_prop));
+
+    let mut generate_schema = serde_json::Map::new();
+    generate_schema.insert("type".to_string(), Value::String("object".to_string()));
+    generate_schema.insert("properties".to_string(), Value::Object(generate_properties));
+    generate_schema.insert(
+        "required".to_string(),
+        Value::Array(vec![Value::String("resume".to_string())]),
+    );
+
+    let generate_schema_arc = Arc::new(generate_schema);
+
+    // Convenience tools for discovery
+    let get_schema_tool = Tool::new(
+        GET_RESUME_SCHEMA_TOOL,
+        "Returns the complete JSON Schema for resume documents. Use this to understand the exact structure, required fields, and data types expected by validate_resume and generate_resume. This is a convenience wrapper around the 'docgen://schemas/resume' resource.",
+        empty_schema.clone(),
+    );
+
+    let get_best_practices_tool = Tool::new(
+        GET_RESUME_BEST_PRACTICES_TOOL,
+        "Returns comprehensive best practices and guidelines for writing effective resume content. Includes writing tips, job description alignment strategies, content guidelines for each section, and the workflow for creating high-quality resumes. Call this BEFORE gathering user information to understand what makes a great resume. This is a convenience wrapper around the 'resume-best-practices' prompt.",
+        empty_schema,
+    );
+
+    // Validation and generation tools
     let validate_tool = Tool::new(
         VALIDATE_RESUME_TOOL,
-        "Validates a resume JSON payload against the schema without generating a document. Returns validation errors with paths if invalid, or confirms validity.",
-        schema_arc.clone(),
+        "Validates a resume JSON payload against the schema without generating a document. Returns validation errors with paths if invalid, or confirms validity. TIP: Use 'get_resume_schema' first to understand the expected structure.",
+        validate_schema_arc,
     );
 
     let generate_tool = Tool::new(
         GENERATE_RESUME_TOOL,
-        "Generates a PDF resume from a JSON payload. Returns base64-encoded PDF data.",
-        schema_arc,
+        "Generates a professionally formatted PDF resume from a JSON payload and saves it to a file. Returns the file path. Optionally accepts a 'filename' parameter (e.g., 'john-doe-resume.pdf'). RECOMMENDED: First use 'get_resume_best_practices' for writing guidance and 'get_resume_schema' for structure, then 'validate_resume' before generating.",
+        generate_schema_arc,
     );
 
-    vec![validate_tool, generate_tool]
+    vec![get_schema_tool, get_best_practices_tool, validate_tool, generate_tool]
+}
+
+/// Returns the JSON schema for resume documents
+///
+/// This is a convenience tool that wraps the 'docgen://schemas/resume' resource,
+/// making it discoverable through tool listing.
+pub fn get_resume_schema() -> Value {
+    match resources::read_resource(resources::RESUME_SCHEMA_URI) {
+        Some(rmcp::model::ResourceContents::TextResourceContents { text, .. }) => {
+            // Parse the schema JSON and return it as a structured value
+            serde_json::from_str(&text).unwrap_or_else(|_| {
+                serde_json::json!({
+                    "error": "Failed to parse schema"
+                })
+            })
+        }
+        _ => serde_json::json!({
+            "error": "Schema resource not found"
+        }),
+    }
+}
+
+/// Returns best practices and guidelines for resume writing
+///
+/// This is a convenience tool that wraps the 'resume-best-practices' prompt,
+/// making it discoverable through tool listing.
+pub fn get_resume_best_practices() -> Value {
+    match prompts::get_prompt(prompts::RESUME_BEST_PRACTICES_PROMPT) {
+        Some(prompt_result) => {
+            // Extract the text content from the prompt message
+            if let Some(msg) = prompt_result.messages.first() {
+                if let rmcp::model::PromptMessageContent::Text { text } = &msg.content {
+                    return serde_json::json!({
+                        "best_practices": text,
+                        "description": prompt_result.description
+                    });
+                }
+            }
+            serde_json::json!({
+                "error": "Failed to extract prompt content"
+            })
+        }
+        None => serde_json::json!({
+            "error": "Best practices prompt not found"
+        }),
+    }
 }
 
 /// Input for the validate_resume tool
 #[derive(Debug, Deserialize)]
 pub struct ValidateResumeInput {
     pub resume: Value,
+}
+
+/// Input for the generate_resume tool
+#[derive(Debug, Deserialize)]
+pub struct GenerateResumeInput {
+    pub resume: Value,
+    pub filename: Option<String>,
 }
 
 /// Validates a resume JSON payload
@@ -155,10 +258,22 @@ pub fn validate_resume(input: Value) -> ValidationResult {
     }
 }
 
-/// Generates a PDF resume from a JSON payload
+/// Generates a PDF resume from a JSON payload and saves it to a file
 pub fn generate_resume(input: Value) -> GenerationResult {
+    // 0. Parse input to get resume and optional filename
+    let parsed_input: GenerateResumeInput = match serde_json::from_value(input.clone()) {
+        Ok(v) => v,
+        Err(e) => {
+            return GenerationResult::Error {
+                message: format!("Invalid tool input: expected object with 'resume' field. {}", e),
+                validation_errors: None,
+            };
+        }
+    };
+
     // 1. Validate
-    let validation_result = validate_resume(input);
+    let validation_input = serde_json::json!({ "resume": parsed_input.resume });
+    let validation_result = validate_resume(validation_input);
 
     let resume = match validation_result {
         ValidationResult::Valid { resume } => resume,
@@ -198,11 +313,29 @@ pub fn generate_resume(input: Value) -> GenerationResult {
         }
     };
 
-    // 4. Encode
-    let base64_pdf = general_purpose::STANDARD.encode(pdf_bytes);
+    // 4. Generate filename (use provided or generate from name)
+    let filename = parsed_input.filename.unwrap_or_else(|| {
+        // Sanitize the name to create a safe filename
+        let name = &resume.basics.name;
+        let sanitized = name
+            .to_lowercase()
+            .replace(" ", "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>();
+        format!("{}-resume.pdf", sanitized)
+    });
 
-    GenerationResult::Success {
-        pdf_base64: base64_pdf,
+    // 5. Save to file
+    match fs::write(&filename, pdf_bytes) {
+        Ok(_) => GenerationResult::Success {
+            file_path: filename.clone(),
+            message: format!("Resume successfully generated and saved to '{}'", filename),
+        },
+        Err(e) => GenerationResult::Error {
+            message: format!("Failed to write PDF to file '{}': {}", filename, e),
+            validation_errors: None,
+        },
     }
 }
 
@@ -303,6 +436,14 @@ fn infer_path_from_context(message: &str, field: &str) -> String {
 /// Execute a tool by name with the given arguments
 pub fn call_tool(name: &str, arguments: Value) -> Result<Value, String> {
     match name {
+        GET_RESUME_SCHEMA_TOOL => {
+            let _ = arguments; // Schema tool takes no arguments
+            Ok(get_resume_schema())
+        }
+        GET_RESUME_BEST_PRACTICES_TOOL => {
+            let _ = arguments; // Best practices tool takes no arguments
+            Ok(get_resume_best_practices())
+        }
         VALIDATE_RESUME_TOOL => {
             let result = validate_resume(arguments);
             serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
@@ -322,9 +463,68 @@ mod tests {
     #[test]
     fn test_list_tools() {
         let tools = list_tools();
-        assert_eq!(tools.len(), 2);
-        assert_eq!(tools[0].name, VALIDATE_RESUME_TOOL);
-        assert_eq!(tools[1].name, GENERATE_RESUME_TOOL);
+        assert_eq!(tools.len(), 4);
+        assert_eq!(tools[0].name, GET_RESUME_SCHEMA_TOOL);
+        assert_eq!(tools[1].name, GET_RESUME_BEST_PRACTICES_TOOL);
+        assert_eq!(tools[2].name, VALIDATE_RESUME_TOOL);
+        assert_eq!(tools[3].name, GENERATE_RESUME_TOOL);
+    }
+
+    #[test]
+    fn test_get_resume_schema() {
+        let schema = get_resume_schema();
+
+        // Should return a valid JSON object
+        assert!(schema.is_object());
+
+        // Should have the basic schema structure
+        assert!(schema.get("$schema").is_some());
+        assert!(schema.get("title").is_some());
+
+        // Should contain Resume type information
+        let schema_str = serde_json::to_string(&schema).unwrap();
+        assert!(schema_str.contains("Resume"));
+        assert!(schema_str.contains("basics"));
+        assert!(schema_str.contains("work"));
+    }
+
+    #[test]
+    fn test_get_resume_best_practices() {
+        let result = get_resume_best_practices();
+
+        // Should return a valid JSON object
+        assert!(result.is_object());
+
+        // Should have best_practices field with text content
+        assert!(result.get("best_practices").is_some());
+
+        let best_practices = result["best_practices"].as_str().unwrap();
+
+        // Should contain key guidance
+        assert!(best_practices.contains("Resume Best Practices"));
+        assert!(best_practices.contains("Contact Information"));
+        assert!(best_practices.contains("Work Experience"));
+        assert!(best_practices.contains("schema"));
+    }
+
+    #[test]
+    fn test_call_tool_get_schema() {
+        let result = call_tool(GET_RESUME_SCHEMA_TOOL, serde_json::json!({}));
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert!(value.is_object());
+        assert!(value.get("$schema").is_some());
+    }
+
+    #[test]
+    fn test_call_tool_get_best_practices() {
+        let result = call_tool(GET_RESUME_BEST_PRACTICES_TOOL, serde_json::json!({}));
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert!(value.is_object());
+        assert!(value.get("best_practices").is_some());
     }
 
     // ... existing validate tests ...
@@ -759,16 +959,23 @@ mod tests {
                     "email": "john@example.com"
                 },
                 "work": []
-            }
+            },
+            "filename": "test-generate-resume-valid.pdf"
         });
 
         // This is a slow test because it compiles PDF
         let result = generate_resume(input);
 
         match result {
-            GenerationResult::Success { pdf_base64 } => {
-                assert!(!pdf_base64.is_empty());
-                assert!(pdf_base64.len() > 100); // Should be a reasonable size
+            GenerationResult::Success { file_path, message } => {
+                assert_eq!(file_path, "test-generate-resume-valid.pdf");
+                assert!(message.contains("successfully"));
+
+                // Verify file was created
+                assert!(std::path::Path::new(&file_path).exists());
+
+                // Clean up
+                let _ = fs::remove_file(&file_path);
             }
             GenerationResult::Error { message, .. } => {
                 panic!("Expected success, got error: {}", message);
@@ -813,7 +1020,8 @@ mod tests {
                     "email": "john@example.com"
                 },
                 "work": []
-            }
+            },
+            "filename": "test-call-tool-generate.pdf"
         });
 
         let result = call_tool(GENERATE_RESUME_TOOL, input);
@@ -821,6 +1029,72 @@ mod tests {
 
         let value = result.unwrap();
         assert_eq!(value["status"], "success");
-        assert!(value.get("pdf_base64").is_some());
+        assert!(value.get("file_path").is_some());
+        assert!(value.get("message").is_some());
+
+        // Clean up generated file
+        if let Some(file_path) = value["file_path"].as_str() {
+            let _ = fs::remove_file(file_path);
+        }
+    }
+
+    #[test]
+    fn test_generate_resume_with_custom_filename() {
+        let input = serde_json::json!({
+            "resume": {
+                "basics": {
+                    "name": "Jane Smith",
+                    "email": "jane@example.com"
+                },
+                "work": []
+            },
+            "filename": "custom-resume.pdf"
+        });
+
+        let result = generate_resume(input);
+
+        match result {
+            GenerationResult::Success { file_path, message } => {
+                assert_eq!(file_path, "custom-resume.pdf");
+                assert!(message.contains("custom-resume.pdf"));
+
+                // Verify file was created
+                assert!(std::path::Path::new(&file_path).exists());
+
+                // Clean up
+                let _ = fs::remove_file(&file_path);
+            }
+            GenerationResult::Error { message, .. } => {
+                panic!("Expected success, got error: {}", message);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_resume_default_filename() {
+        let input = serde_json::json!({
+            "resume": {
+                "basics": {
+                    "name": "Alice Wonder",
+                    "email": "alice@example.com"
+                },
+                "work": []
+            }
+        });
+
+        let result = generate_resume(input);
+
+        match result {
+            GenerationResult::Success { file_path, .. } => {
+                // Should generate filename from name
+                assert_eq!(file_path, "alice-wonder-resume.pdf");
+
+                // Clean up
+                let _ = fs::remove_file(&file_path);
+            }
+            GenerationResult::Error { message, .. } => {
+                panic!("Expected success, got error: {}", message);
+            }
+        }
     }
 }
