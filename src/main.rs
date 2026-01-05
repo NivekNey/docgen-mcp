@@ -123,7 +123,17 @@ impl ServerHandler for DocgenServer {
             instructions: Some(
                 "A Model Context Protocol server for programmatic document generation, \
                  powered by Typst. Use this server to generate professionally typeset \
-                 documents like resumes and CVs."
+                 documents like resumes and CVs.\n\n\
+                 RECOMMENDED WORKFLOW FOR AI AGENTS:\n\
+                 1. Use 'get_resume_best_practices' tool to understand writing guidelines and best practices\n\
+                 2. Use 'get_resume_schema' tool to see the exact JSON structure required\n\
+                 3. Gather information from the user and construct the resume JSON\n\
+                 4. Use 'validate_resume' tool to check the JSON structure\n\
+                 5. Use 'generate_resume' tool to create the final PDF\n\n\
+                 Following this workflow ensures high-quality, properly structured documents.\n\n\
+                 ALTERNATIVE: Advanced agents can also use:\n\
+                 - PROMPT 'resume-best-practices' for comprehensive guidance\n\
+                 - RESOURCE 'docgen://schemas/resume' for schema definition"
                     .to_string(),
             ),
         }

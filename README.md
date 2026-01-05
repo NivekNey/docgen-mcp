@@ -12,32 +12,41 @@ docgen-mcp provides a structured approach to document generation through MCP:
 
 ```mermaid
 sequenceDiagram
-    participant Client as Client<br/>(Claude Desktop: stdio<br/>Claude.ai: HTTP/SSE)
+    participant Client as AI Agent
     participant Server as docgen-mcp Server
     participant Schema as Schema Generator<br/>(schemars)
     participant Validator as Type Validator<br/>(serde)
     participant Typst as Typst Compiler
+    participant FS as File System
 
-    Note over Client,Server: 1. Schema Discovery
-    Client->>+Server: resources/read<br/>"docgen://schemas/resume"
+    Note over Client,Server: 1. Get Best Practices (Recommended)
+    Client->>+Server: tools/call<br/>"get_resume_best_practices"
+    Server-->>-Client: Writing guidelines & tips
+
+    Note over Client,Server: 2. Get Schema (Recommended)
+    Client->>+Server: tools/call<br/>"get_resume_schema"
     Server->>+Schema: Generate JSON Schema<br/>from Rust types
     Schema-->>-Server: JSON Schema
-    Server-->>-Client: Resume schema definition
+    Server-->>-Client: Resume schema structure
 
-    Note over Client,Server: 2. Best Practices (Optional)
-    Client->>+Server: prompts/get<br/>"resume_best_practices"
-    Server-->>-Client: Guidelines & tips
+    Note over Client,Server: 3. Validate (Recommended)
+    Client->>+Server: tools/call<br/>"validate_resume"<br/>+ JSON payload
+    Server->>+Validator: Deserialize JSON
+    Validator-->>-Server: Validation result
+    Server-->>-Client: Valid / Error with paths
 
-    Note over Client,Server: 3. Resume Generation
-    Client->>+Server: tools/call<br/>"generate_resume"<br/>+ JSON payload
-    Server->>+Validator: Deserialize JSON<br/>into Rust types
-    Validator-->>Server: Validated Resume struct
-    Server->>Server: Transform Rust types<br/>to Typst markup
-    Server->>+Typst: Compile Typst document
+    Note over Client,Server: 4. Generate Resume
+    Client->>+Server: tools/call<br/>"generate_resume"<br/>+ JSON payload + filename
+    Server->>+Validator: Deserialize & validate
+    Validator-->>-Server: Validated Resume struct
+    Server->>Server: Transform to Typst markup
+    Server->>+Typst: Compile document
     Typst-->>-Server: PDF bytes
-    Server-->>-Client: base64-encoded PDF
+    Server->>+FS: Write to file
+    FS-->>-Server: Success
+    Server-->>-Client: File path & success message
 
-    Note over Client: User downloads<br/>generated resume
+    Note over Client: AI tells user:<br/>"Resume saved to<br/>john-doe-resume.pdf"
 ```
 
 ## Features
@@ -169,8 +178,17 @@ Example schema (simplified):
 
 | Name | Description |
 |------|-------------|
-| `generate_resume` | Accepts a JSON payload conforming to the resume schema, returns a PDF |
-| `validate_resume` | Validates a payload against the schema without generating |
+| `get_resume_schema` | Returns the complete JSON Schema for resume documents (convenience wrapper for `docgen://schemas/resume` resource) |
+| `get_resume_best_practices` | Returns comprehensive resume writing guidelines (convenience wrapper for `resume-best-practices` prompt) |
+| `validate_resume` | Validates a JSON payload against the schema without generating a document |
+| `generate_resume` | Generates a PDF resume from JSON payload and saves it to a file. Accepts optional `filename` parameter |
+
+**Recommended Workflow for AI Agents:**
+1. Call `get_resume_best_practices` to understand resume writing guidelines
+2. Call `get_resume_schema` to see the expected JSON structure
+3. Gather information from the user and construct the resume JSON
+4. Call `validate_resume` to check the structure
+5. Call `generate_resume` to create the PDF file
 
 ## Project Structure
 
@@ -211,12 +229,25 @@ docgen-mcp/
 
 ### Data Flow
 
-1. **Schema Discovery** — Client reads `docgen://schemas/resume` to understand the expected structure
-2. **Content Creation** — Client (often an LLM) constructs JSON matching the schema
-3. **Validation** — Server validates payload by deserializing into Rust types (via serde)
-4. **Transformation** — Validated Rust types are transformed into Typst markup
-5. **Compilation** — Embedded Typst compiler renders the document
-6. **Output** — PDF bytes returned to client (base64-encoded in MCP response)
+**Recommended Workflow:**
+1. **Best Practices** — AI agent calls `get_resume_best_practices` tool to understand guidelines
+2. **Schema Discovery** — AI agent calls `get_resume_schema` tool to see the JSON structure
+3. **Content Creation** — AI agent gathers info from user and constructs JSON matching the schema
+4. **Validation** — AI agent calls `validate_resume` to verify structure before generating
+5. **Generation** — AI agent calls `generate_resume` with JSON payload (and optional filename)
+6. **Transformation** — Server transforms validated Rust types into Typst markup
+7. **Compilation** — Embedded Typst compiler renders the document
+8. **File Output** — PDF saved to working directory, file path returned to AI agent
+
+**Alternative (Advanced):** Agents can also directly access MCP resources/prompts:
+- RESOURCE `docgen://schemas/resume` for schema
+- PROMPT `resume-best-practices` for guidelines
+
+**Why Tools Instead of base64?**
+- Saves tokens (no 70KB+ base64 strings)
+- AI agents can naturally reference the file
+- User gets immediate file access
+- Better UX overall
 
 ### Key Dependencies
 
@@ -364,8 +395,8 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 > *Full pipeline: JSON → Typst → PDF*
 
 - [x] Transform `Resume` struct into Typst markup string
-- [x] Wire up `generate_resume` tool: validate → transform → compile → encode
-- [x] Return PDF as base64 in tool response
+- [x] Wire up `generate_resume` tool: validate → transform → compile → save
+- [x] Save PDF to file and return file path
 - [x] Add error handling for compilation failures
 - [x] Integration test: sample JSON → valid PDF
 
@@ -377,9 +408,10 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 - Added `Project` struct to schema and `location` fields to `WorkExperience` and `Education`
 - Created `src/typst/transform.rs` to safely inject JSON data into Typst
 - Implemented `generate_resume` tool that combines validation, transformation, and compilation
-- Integrated `base64` for encoding PDF output in MCP tool responses
+- Changed output from base64 to file-based (saves tokens, better AI agent UX)
+- Added optional `filename` parameter with auto-generation from name
 - Increased integration test timeouts to handle increased binary size and startup time
-- All 35 tests (32 unit + 3 integration) passing ✅
+- All tests passing ✅
 
 ---
 
@@ -455,7 +487,41 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ---
 
-### Milestone 8: Polish & Release
+### Milestone 8: AI Agent UX Optimization ✅
+> *Make the server work great with ANY AI agent*
+
+- [x] Add convenience tools wrapping resources/prompts for discoverability
+- [x] Implement `get_resume_schema` tool (wraps resource)
+- [x] Implement `get_resume_best_practices` tool (wraps prompt)
+- [x] Update server instructions to guide AI agents through recommended workflow
+- [x] Change PDF output from base64 to file-based (token efficiency)
+- [x] Add optional `filename` parameter to `generate_resume`
+- [x] Update tool descriptions to reference workflow steps
+- [x] Add tests for new tools and file output
+
+**Deliverable:** Server optimized for AI agent discovery and usage ✅
+
+**Implementation Notes:**
+- Added `get_resume_schema` and `get_resume_best_practices` as discoverable tools
+- These wrap existing resources/prompts, providing both semantic MCP structure AND pragmatic discoverability
+- Server instructions now explicitly guide AI agents through 5-step workflow
+- Changed `generate_resume` output from base64-encoded PDF to file path
+  - Saves 70KB+ tokens per resume
+  - AI agents can naturally reference files
+  - Better user experience
+- Auto-generates filename from resume name if not provided
+- Updated all tool descriptions to cross-reference and guide workflow
+- All 48 tests (45 unit + 3 integration) passing ✅
+
+**Design Philosophy:**
+- "Pit of success" - Server should work well regardless of AI agent quality
+- Discoverable - Critical features exposed as tools that agents naturally find
+- Token efficient - File output instead of base64
+- Guided - Instructions and descriptions lead agents to best practices
+
+---
+
+### Milestone 9: Polish & Release
 > *Production-ready*
 
 - [ ] Comprehensive error messages
