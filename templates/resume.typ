@@ -1,5 +1,7 @@
 #let resume(data) = {
-  set text(font: "Libertinus Serif", size: 10pt)
+  // Using New Computer Modern for better readability
+  // Alternative options: "Linux Libertine", "TeX Gyre Pagella", "TeX Gyre Termes"
+  set text(font: "New Computer Modern", size: 10pt)
   set page(
     paper: "us-letter",
     margin: (x: 0.5in, y: 0.5in),
@@ -8,11 +10,11 @@
 
   // Helper for section headers
   let section-header(title) = {
-    v(8pt)
+    v(6pt)
     text(size: 12pt, weight: "bold", smallcaps(title))
-    v(2pt)
+    v(1pt)
     line(length: 100%, stroke: 0.5pt)
-    v(4pt)
+    v(3pt)
   }
 
   // Helper for entry headers (4-quadrant layout)
@@ -52,18 +54,18 @@
             )
           )
           #if "gpa" in edu and edu.gpa != none [
-            #v(3pt)
+            #v(2pt)
             GPA: #edu.gpa
           ]
           #if "highlights" in edu and edu.highlights.len() > 0 [
-            #v(4pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
+            #v(2pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 2pt)
             #for h in edu.highlights [
               - #h
             ]
           ]
         ]
-        #v(6pt)
+        #v(4pt)
       ]
     ]
   }
@@ -83,14 +85,14 @@
             if "location" in w and w.location != none [#w.location]
           )
           #if "highlights" in w and w.highlights.len() > 0 [
-            #v(4pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
+            #v(2pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 2pt)
             #for h in w.highlights [
               - #h
             ]
           ]
         ]
-        #v(6pt)
+        #v(4pt)
       ]
     ]
   }
@@ -119,18 +121,18 @@
             ]
           )
           #if "description" in p and p.description != none [
-            #v(3pt)
+            #v(2pt)
             #text(style: "italic", size: 9pt)[#p.description]
           ]
           #if "highlights" in p and p.highlights.len() > 0 [
-            #v(4pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
+            #v(2pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 2pt)
             #for h in p.highlights [
               - #h
             ]
           ]
         ]
-        #v(6pt)
+        #v(4pt)
       ]
     ]
   }
@@ -153,11 +155,11 @@
             ]
           )
           #if "url" in cert and cert.url != none [
-            #v(2pt)
+            #v(1pt)
             #link(cert.url)[#underline(text(size: 9pt)[#cert.url.replace("https://", "").replace("http://", "")])]
           ]
         ]
-        #v(5pt)
+        #v(3pt)
       ]
     ]
   }
@@ -180,11 +182,11 @@
             ]
           )
           #if "summary" in award and award.summary != none [
-            #v(3pt)
+            #v(2pt)
             #text(size: 9pt)[#award.summary]
           ]
         ]
-        #v(5pt)
+        #v(3pt)
       ]
     ]
   }
@@ -265,8 +267,8 @@
 
   // === SUMMARY ===
   if "summary" in data.basics and data.basics.summary != none [
-    #v(6pt)
-    #text(style: "italic")[#data.basics.summary]
+    #v(4pt)
+    #data.basics.summary
   ]
 
   // === RENDER SECTIONS IN ORDER ===
