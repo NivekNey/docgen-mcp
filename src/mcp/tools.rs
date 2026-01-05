@@ -7,6 +7,7 @@
 //! - `validate_resume` - Validates JSON payload against resume schema
 //! - `generate_resume` - Generates a PDF from a resume JSON payload
 
+use base64::{Engine as _, engine::general_purpose};
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -55,8 +56,10 @@ pub enum GenerationResult {
     /// Generation succeeded
     #[serde(rename = "success")]
     Success {
-        /// Path to the generated PDF file
+        /// Path to the generated PDF file (useful for local/stdio mode)
         file_path: String,
+        /// Base64-encoded PDF content (useful for remote/HTTP mode)
+        pdf_content: String,
         /// Human-readable success message
         message: String,
     },
@@ -163,7 +166,7 @@ pub fn list_tools() -> Vec<Tool> {
 
     let generate_tool = Tool::new(
         GENERATE_RESUME_TOOL,
-        "Generates a professionally formatted PDF resume from a JSON payload and saves it to a file. Returns the file path. Optionally accepts a 'filename' parameter (e.g., 'john-doe-resume.pdf'). RECOMMENDED: First use 'get_resume_best_practices' for writing guidance and 'get_resume_schema' for structure, then 'validate_resume' before generating.",
+        "Generates a professionally formatted PDF resume from a JSON payload. Returns both the file path (for local usage) and base64-encoded PDF content (for remote MCP usage). Optionally accepts a 'filename' parameter (e.g., 'john-doe-resume.pdf'). RECOMMENDED: First use 'get_resume_best_practices' for writing guidance and 'get_resume_schema' for structure, then 'validate_resume' before generating.",
         generate_schema_arc,
     );
 
@@ -329,10 +332,14 @@ pub fn generate_resume(input: Value) -> GenerationResult {
         format!("{}-resume.pdf", sanitized)
     });
 
-    // 5. Save to file
+    // 5. Encode PDF as base64 (for remote MCP usage)
+    let pdf_base64 = general_purpose::STANDARD.encode(&pdf_bytes);
+
+    // 6. Save to file (for local/stdio usage)
     match fs::write(&filename, pdf_bytes) {
         Ok(_) => GenerationResult::Success {
             file_path: filename.clone(),
+            pdf_content: pdf_base64,
             message: format!("Resume successfully generated and saved to '{}'", filename),
         },
         Err(e) => GenerationResult::Error {
@@ -970,9 +977,13 @@ mod tests {
         let result = generate_resume(input);
 
         match result {
-            GenerationResult::Success { file_path, message } => {
+            GenerationResult::Success { file_path, pdf_content, message } => {
                 assert_eq!(file_path, "test-generate-resume-valid.pdf");
                 assert!(message.contains("successfully"));
+
+                // Verify base64 content is present and valid
+                assert!(!pdf_content.is_empty());
+                assert!(general_purpose::STANDARD.decode(&pdf_content).is_ok());
 
                 // Verify file was created
                 assert!(std::path::Path::new(&file_path).exists());
@@ -1033,7 +1044,14 @@ mod tests {
         let value = result.unwrap();
         assert_eq!(value["status"], "success");
         assert!(value.get("file_path").is_some());
+        assert!(value.get("pdf_content").is_some());
         assert!(value.get("message").is_some());
+
+        // Verify pdf_content is valid base64
+        if let Some(pdf_content) = value["pdf_content"].as_str() {
+            assert!(!pdf_content.is_empty());
+            assert!(general_purpose::STANDARD.decode(pdf_content).is_ok());
+        }
 
         // Clean up generated file
         if let Some(file_path) = value["file_path"].as_str() {
@@ -1057,9 +1075,10 @@ mod tests {
         let result = generate_resume(input);
 
         match result {
-            GenerationResult::Success { file_path, message } => {
+            GenerationResult::Success { file_path, pdf_content, message } => {
                 assert_eq!(file_path, "custom-resume.pdf");
                 assert!(message.contains("custom-resume.pdf"));
+                assert!(!pdf_content.is_empty());
 
                 // Verify file was created
                 assert!(std::path::Path::new(&file_path).exists());
@@ -1088,9 +1107,10 @@ mod tests {
         let result = generate_resume(input);
 
         match result {
-            GenerationResult::Success { file_path, .. } => {
+            GenerationResult::Success { file_path, pdf_content, .. } => {
                 // Should generate filename from name
                 assert_eq!(file_path, "alice-wonder-resume.pdf");
+                assert!(!pdf_content.is_empty());
 
                 // Clean up
                 let _ = fs::remove_file(&file_path);
