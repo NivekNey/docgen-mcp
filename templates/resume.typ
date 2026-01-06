@@ -43,9 +43,9 @@
         title = data.sectionTitles.at(section-name)
       }
     }
-    v(0pt)
+    v(4pt)
     text(size: 12pt, weight: "bold", smallcaps(title))
-    v(-10pt)
+    v(-4pt)
     line(length: 100%, stroke: 0.5pt)
   }
 
