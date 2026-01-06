@@ -8,11 +8,9 @@
 
   // Helper for section headers
   let section-header(title) = {
-    v(6pt)
     text(size: 12pt, weight: "bold", smallcaps(title))
-    v(-8pt)
+    v(-10pt)
     line(length: 100%, stroke: 0.5pt)
-    v(2pt)
   }
 
   // Helper for entry headers (4-quadrant layout)
@@ -20,7 +18,7 @@
     grid(
       columns: (1fr, auto),
       rows: (auto, auto),
-      gutter: 0pt,
+      gutter: 4pt,
       text(weight: "bold")[#top-left],
       align(right)[#top-right],
       text(style: "italic")[#bottom-left],
@@ -52,18 +50,15 @@
             )
           )
           #if "gpa" in edu and edu.gpa != none [
-            #v(1pt)
             GPA: #edu.gpa
           ]
           #if "highlights" in edu and edu.highlights.len() > 0 [
-            #v(2pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in edu.highlights [
               - #h
             ]
           ]
         ]
-        #v(4pt)
       ]
     ]
   }
@@ -83,14 +78,12 @@
             if "location" in w and w.location != none [#w.location]
           )
           #if "highlights" in w and w.highlights.len() > 0 [
-            #v(2pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in w.highlights [
               - #h
             ]
           ]
         ]
-        #v(4pt)
       ]
     ]
   }
@@ -119,18 +112,15 @@
             ]
           )
           #if "description" in p and p.description != none [
-            #v(1pt)
             #text(style: "italic", size: 9pt)[#p.description]
           ]
           #if "highlights" in p and p.highlights.len() > 0 [
-            #v(2pt)
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 3pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in p.highlights [
               - #h
             ]
           ]
         ]
-        #v(4pt)
       ]
     ]
   }
@@ -156,7 +146,6 @@
             #link(cert.url)[#underline(text(size: 9pt)[#cert.url.replace("https://", "").replace("http://", "")])]
           ]
         ]
-        #v(3pt)
       ]
     ]
   }
@@ -179,11 +168,9 @@
             ]
           )
           #if "summary" in award and award.summary != none [
-            #v(1pt)
             #text(size: 9pt)[#award.summary]
           ]
         ]
-        #v(3pt)
       ]
     ]
   }
@@ -192,7 +179,6 @@
     if "publications" in data and data.publications != none [
       #section-header("Publications")
       #text[#data.publications]
-      #v(4pt)
     ]
   }
 
@@ -242,12 +228,10 @@
   // === HEADER ===
   align(center)[
     #text(2em, weight: "bold", smallcaps(data.basics.name))
-    #v(-4pt)
 
     // Location line (if present)
     #if "location" in data.basics and data.basics.location != none [
       #text(size: 10pt)[#data.basics.location]
-      #v(-2pt)
     ]
 
     // Contact line
@@ -264,9 +248,9 @@
 
   // === SUMMARY ===
   if "summary" in data.basics and data.basics.summary != none [
-    #v(6pt)
-    #text(style: "italic")[#data.basics.summary]
+    #data.basics.summary
   ]
+  v(0pt)
 
   // === RENDER SECTIONS IN ORDER ===
   for section in section-order {
