@@ -66,6 +66,8 @@ mod tests {
             publications: vec![],
             section_order: None,
             section_titles: None,
+            show_header: None,
+            show_page_numbers: None,
         };
 
         let result = transform_resume(&resume);
@@ -99,6 +101,8 @@ mod tests {
             publications: vec![],
             section_order: None,
             section_titles: None,
+            show_header: None,
+            show_page_numbers: None,
         };
 
         let source = transform_resume(&resume).unwrap();
@@ -137,6 +141,8 @@ mod tests {
                 "skills".to_string(),
             ]),
             section_titles: None,
+            show_header: None,
+            show_page_numbers: None,
         };
 
         let source = transform_resume(&resume).unwrap();

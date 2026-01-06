@@ -879,6 +879,8 @@ mod tests {
                 publications: vec![],
                 section_order: None,
                 section_titles: None,
+                show_header: None,
+                show_page_numbers: None,
             }),
         };
 

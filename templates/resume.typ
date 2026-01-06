@@ -1,10 +1,39 @@
 #let resume(data) = {
   set text(font: "Libertinus Serif", size: 10pt)
+
+  // Extract configuration options with defaults
+  let show-header = if "showHeader" in data { data.showHeader } else { true }
+  let show-page-numbers = if "showPageNumbers" in data { data.showPageNumbers } else { true }
+
   set page(
     paper: "us-letter",
     margin: (x: 0.5in, y: 0.5in),
+    header: if show-header {
+      context {
+        let page-num = counter(page).get().first()
+        if page-num > 1 [
+          #set text(size: 9pt)
+          #line(length: 100%, stroke: 0.5pt)
+          #v(-8pt)
+          #align(center)[#data.basics.name]
+          #v(-4pt)
+        ]
+      }
+    },
+    footer: if show-page-numbers {
+      context {
+        set text(size: 9pt)
+        let page-num = counter(page).get().first()
+        let page-count = counter(page).final().first()
+        align(center)[Page #page-num of #page-count]
+      }
+    },
   )
   set par(justify: true)
+
+  // Prevent orphaned headlines and widow/orphan lines
+  set par(leading: 0.65em, spacing: 0.65em)
+  set block(spacing: 0.65em)
 
   // Helper for section headers with custom title support
   let section-header(default-title, section-name: none) = {
@@ -43,9 +72,34 @@
   // === SECTION RENDERERS ===
 
   let render-education() = {
-    if "education" in data and data.education.len() > 0 [
-      #section-header("Education", section-name: "education")
-      #for edu in data.education [
+    if "education" in data and data.education.len() > 0 {
+      // Wrap header with first entry to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Education", section-name: "education")
+        #if data.education.len() > 0 {
+          let edu = data.education.at(0)
+          entry-header(
+            edu.institution,
+            if "location" in edu and edu.location != none [#edu.location],
+            [#if "degree" in edu [#edu.degree]#if "fieldOfStudy" in edu [, #edu.fieldOfStudy]],
+            format-dates(
+              if "startDate" in edu { edu.startDate } else { none },
+              if "endDate" in edu { edu.endDate } else { none }
+            )
+          )
+          if "gpa" in edu and edu.gpa != none [
+            GPA: #edu.gpa
+          ]
+          if "highlights" in edu and edu.highlights.len() > 0 [
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
+            #for h in edu.highlights [
+              - #h
+            ]
+          ]
+        }
+      ]
+      // Render remaining entries
+      for edu in data.education.slice(1) [
         #block(breakable: false)[
           #entry-header(
             edu.institution,
@@ -67,13 +121,35 @@
           ]
         ]
       ]
-    ]
+    }
   }
 
   let render-experience() = {
-    if "work" in data and data.work.len() > 0 [
-      #section-header("Experience", section-name: "experience")
-      #for w in data.work [
+    if "work" in data and data.work.len() > 0 {
+      // Wrap header with first entry to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Experience", section-name: "experience")
+        #if data.work.len() > 0 {
+          let w = data.work.at(0)
+          entry-header(
+            w.position,
+            format-dates(
+              if "startDate" in w { w.startDate } else { none },
+              if "endDate" in w { w.endDate } else { none }
+            ),
+            w.company,
+            if "location" in w and w.location != none [#w.location]
+          )
+          if "highlights" in w and w.highlights.len() > 0 [
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
+            #for h in w.highlights [
+              - #h
+            ]
+          ]
+        }
+      ]
+      // Render remaining entries
+      for w in data.work.slice(1) [
         #block(breakable: false)[
           #entry-header(
             w.position,
@@ -92,13 +168,47 @@
           ]
         ]
       ]
-    ]
+    }
   }
 
   let render-projects() = {
-    if "projects" in data and data.projects.len() > 0 [
-      #section-header("Projects", section-name: "projects")
-      #for p in data.projects [
+    if "projects" in data and data.projects.len() > 0 {
+      // Wrap header with first entry to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Projects", section-name: "projects")
+        #if data.projects.len() > 0 {
+          let p = data.projects.at(0)
+          grid(
+            columns: (1fr, auto),
+            [
+              *#p.name*
+              #if "keywords" in p and p.keywords.len() > 0 [
+                #h(4pt) | #h(4pt) #text(style: "italic", size: 9pt)[#p.keywords.join(", ")]
+              ]
+              #if "url" in p and p.url != none [
+                #h(4pt) | #h(4pt) #link(p.url)[#underline(text(size: 9pt)[#p.url.replace("https://", "").replace("http://", "")])]
+              ]
+            ],
+            align(right)[
+              #format-dates(
+                if "startDate" in p { p.startDate } else { none },
+                if "endDate" in p { p.endDate } else { none }
+              )
+            ]
+          )
+          if "description" in p and p.description != none [
+            #text(style: "italic", size: 9pt)[#p.description]
+          ]
+          if "highlights" in p and p.highlights.len() > 0 [
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
+            #for h in p.highlights [
+              - #h
+            ]
+          ]
+        }
+      ]
+      // Render remaining entries
+      for p in data.projects.slice(1) [
         #block(breakable: false)[
           #grid(
             columns: (1fr, auto),
@@ -129,13 +239,35 @@
           ]
         ]
       ]
-    ]
+    }
   }
 
   let render-certifications() = {
-    if "certifications" in data and data.certifications.len() > 0 [
-      #section-header("Certifications", section-name: "certifications")
-      #for cert in data.certifications [
+    if "certifications" in data and data.certifications.len() > 0 {
+      // Wrap header with first entry to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Certifications", section-name: "certifications")
+        #if data.certifications.len() > 0 {
+          let cert = data.certifications.at(0)
+          grid(
+            columns: (1fr, auto),
+            [
+              *#cert.name*
+              #if "issuer" in cert and cert.issuer != none [
+                #h(4pt) | #h(4pt) #text(style: "italic")[#cert.issuer]
+              ]
+            ],
+            align(right)[
+              #if "date" in cert and cert.date != none [#cert.date]
+            ]
+          )
+          if "url" in cert and cert.url != none [
+            #link(cert.url)[#underline(text(size: 9pt)[#cert.url.replace("https://", "").replace("http://", "")])]
+          ]
+        }
+      ]
+      // Render remaining entries
+      for cert in data.certifications.slice(1) [
         #block(breakable: false)[
           #grid(
             columns: (1fr, auto),
@@ -154,13 +286,35 @@
           ]
         ]
       ]
-    ]
+    }
   }
 
   let render-awards() = {
-    if "awards" in data and data.awards.len() > 0 [
-      #section-header("Awards", section-name: "awards")
-      #for award in data.awards [
+    if "awards" in data and data.awards.len() > 0 {
+      // Wrap header with first entry to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Awards", section-name: "awards")
+        #if data.awards.len() > 0 {
+          let award = data.awards.at(0)
+          grid(
+            columns: (1fr, auto),
+            [
+              *#award.title*
+              #if "awarder" in award and award.awarder != none [
+                #h(4pt) | #h(4pt) #text(style: "italic")[#award.awarder]
+              ]
+            ],
+            align(right)[
+              #if "date" in award and award.date != none [#award.date]
+            ]
+          )
+          if "summary" in award and award.summary != none [
+            #text(size: 9pt)[#award.summary]
+          ]
+        }
+      ]
+      // Render remaining entries
+      for award in data.awards.slice(1) [
         #block(breakable: false)[
           #grid(
             columns: (1fr, auto),
@@ -179,13 +333,41 @@
           ]
         ]
       ]
-    ]
+    }
   }
 
   let render-publications() = {
-    if "publications" in data and data.publications.len() > 0 [
-      #section-header("Publications", section-name: "publications")
-      #for pub in data.publications [
+    if "publications" in data and data.publications.len() > 0 {
+      // Wrap header with first entry to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Publications", section-name: "publications")
+        #if data.publications.len() > 0 {
+          let pub = data.publications.at(0)
+          grid(
+            columns: (1fr, auto),
+            [
+              *#pub.title*
+              #if "authors" in pub and pub.authors.len() > 0 [
+                \ #text(style: "italic", size: 9pt)[#pub.authors.join(", ")]
+              ]
+              #if "venue" in pub and pub.venue != none [
+                \ #text(size: 9pt)[#pub.venue]
+              ]
+              #if "url" in pub and pub.url != none [
+                \ #link(pub.url)[#underline(text(size: 9pt)[#pub.url.replace("https://", "").replace("http://", "")])]
+              ]
+            ],
+            align(right)[
+              #if "date" in pub and pub.date != none [#pub.date]
+            ]
+          )
+          if "summary" in pub and pub.summary != none [
+            #text(size: 9pt)[#pub.summary]
+          ]
+        }
+      ]
+      // Render remaining entries
+      for pub in data.publications.slice(1) [
         #block(breakable: false)[
           #grid(
             columns: (1fr, auto),
@@ -210,28 +392,34 @@
           ]
         ]
       ]
-    ]
+    }
   }
 
   let render-skills() = {
-    if "skills" in data and data.skills.len() > 0 [
-      #section-header("Technical Skills", section-name: "skills")
-      #for skill in data.skills [
-        *#skill.name:* #skill.keywords.join(", ")
-        #linebreak()
+    if "skills" in data and data.skills.len() > 0 {
+      // Wrap header with content to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Technical Skills", section-name: "skills")
+        #for skill in data.skills [
+          *#skill.name:* #skill.keywords.join(", ")
+          #linebreak()
+        ]
       ]
-    ]
+    }
   }
 
   let render-languages() = {
-    if "languages" in data and data.languages.len() > 0 [
-      #section-header("Languages", section-name: "languages")
-      #let lang-items = data.languages.map(lang => {
-        if "fluency" in lang and lang.fluency != none [*#lang.language* (#lang.fluency)]
-        else [*#lang.language*]
-      })
-      #lang-items.join("  •  ")
-    ]
+    if "languages" in data and data.languages.len() > 0 {
+      // Wrap header with content to prevent orphaned headlines
+      block(breakable: false)[
+        #section-header("Languages", section-name: "languages")
+        #let lang-items = data.languages.map(lang => {
+          if "fluency" in lang and lang.fluency != none [*#lang.language* (#lang.fluency)]
+          else [*#lang.language*]
+        })
+        #lang-items.join("  •  ")
+      ]
+    }
   }
 
   // Section dispatcher

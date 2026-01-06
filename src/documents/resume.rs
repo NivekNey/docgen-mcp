@@ -68,6 +68,28 @@ pub struct Resume {
         description = "Custom section titles. Object mapping section names to custom titles. For example: {\"publications\": \"Related Publications\", \"skills\": \"Core Competencies\"}. Valid section names: 'education', 'experience', 'projects', 'certifications', 'awards', 'publications', 'skills', 'languages'."
     )]
     pub section_titles: Option<std::collections::HashMap<String, String>>,
+
+    /// Show name header on subsequent pages
+    #[serde(
+        rename = "showHeader",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        description = "Show name header on pages 2+. Default: true. Best practice for multi-page resumes to help if pages get separated."
+    )]
+    pub show_header: Option<bool>,
+
+    /// Show page numbers in footer
+    #[serde(
+        rename = "showPageNumbers",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        description = "Show page numbers in footer (e.g., 'Page 1 of 2'). Default: true. Professional standard for multi-page documents."
+    )]
+    pub show_page_numbers: Option<bool>,
 }
 
 /// A project entry
@@ -383,6 +405,8 @@ mod tests {
             }],
             section_order: None,
             section_titles: None,
+            show_header: None,
+            show_page_numbers: None,
         };
 
         let json = serde_json::to_string_pretty(&resume).unwrap();
