@@ -2,30 +2,17 @@
   set text(font: "Libertinus Serif", size: 10pt)
 
   // Extract configuration options with defaults
-  let show-header = if "showHeader" in data { data.showHeader } else { true }
   let show-page-numbers = if "showPageNumbers" in data { data.showPageNumbers } else { true }
 
   set page(
     paper: "us-letter",
     margin: (x: 0.5in, y: 0.5in),
-    header: if show-header {
-      context {
-        let page-num = counter(page).get().first()
-        if page-num > 1 [
-          #set text(size: 9pt)
-          #line(length: 100%, stroke: 0.5pt)
-          #v(-8pt)
-          #align(center)[#data.basics.name]
-          #v(-4pt)
-        ]
-      }
-    },
     footer: if show-page-numbers {
       context {
         set text(size: 9pt)
         let page-num = counter(page).get().first()
         let page-count = counter(page).final().first()
-        align(center)[Page #page-num of #page-count]
+        align(center)[#data.basics.name | Page #page-num of #page-count]
       }
     },
   )
@@ -473,7 +460,9 @@
 
   // === SUMMARY ===
   if "summary" in data.basics and data.basics.summary != none [
+    #v(10pt)
     #data.basics.summary
+    #v(10pt)
   ]
 
   // === RENDER SECTIONS IN ORDER ===
