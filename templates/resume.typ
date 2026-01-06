@@ -4,14 +4,12 @@
     paper: "us-letter",
     margin: (x: 0.5in, y: 0.5in),
   )
-  set par(
-    justify: true,
-    leading: 0.5em,  // Controls line spacing globally (default is ~0.65em)
-  )
+  set par(justify: true)
 
   // Helper for section headers
   let section-header(title) = {
     text(size: 12pt, weight: "bold", smallcaps(title))
+    v(-10pt)
     line(length: 100%, stroke: 0.5pt)
   }
 
@@ -20,7 +18,7 @@
     grid(
       columns: (1fr, auto),
       rows: (auto, auto),
-      gutter: 3pt,
+      gutter: 4pt,
       text(weight: "bold")[#top-left],
       align(right)[#top-right],
       text(style: "italic")[#bottom-left],
@@ -55,7 +53,7 @@
             GPA: #edu.gpa
           ]
           #if "highlights" in edu and edu.highlights.len() > 0 [
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 0pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in edu.highlights [
               - #h
             ]
@@ -80,7 +78,7 @@
             if "location" in w and w.location != none [#w.location]
           )
           #if "highlights" in w and w.highlights.len() > 0 [
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 0pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in w.highlights [
               - #h
             ]
@@ -117,7 +115,7 @@
             #text(style: "italic", size: 9pt)[#p.description]
           ]
           #if "highlights" in p and p.highlights.len() > 0 [
-            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 0pt)
+            #set list(marker: text(size: 0.7em)[•], body-indent: 0.5em, spacing: 4pt)
             #for h in p.highlights [
               - #h
             ]
@@ -252,6 +250,7 @@
   if "summary" in data.basics and data.basics.summary != none [
     #data.basics.summary
   ]
+  v(0pt)
 
   // === RENDER SECTIONS IN ORDER ===
   for section in section-order {
