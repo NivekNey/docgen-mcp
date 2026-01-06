@@ -462,9 +462,11 @@
          contact.push(link(p.url)[#underline(p.url.replace("https://", "").replace("http://", ""))])
       }
     }
-    #text(size: 9pt)[
-      #for (i, item) in contact.enumerate() [
-        #if i > 0 [  |  ]#item
+    #par(justify: true)[
+      #text(size: 9pt)[
+        #for (i, item) in contact.enumerate() [
+          #if i > 0 [  |  ]#item
+        ]
       ]
     ]
   ]
