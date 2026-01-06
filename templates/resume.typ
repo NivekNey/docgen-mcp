@@ -8,6 +8,7 @@
 
   // Helper for section headers
   let section-header(title) = {
+    v(0pt)
     text(size: 12pt, weight: "bold", smallcaps(title))
     v(-10pt)
     line(length: 100%, stroke: 0.5pt)
@@ -178,7 +179,7 @@
   let render-publications() = {
     if "publications" in data and data.publications != none [
       #section-header("Publications")
-      #text[#data.publications]
+      #data.publications
     ]
   }
 
@@ -243,14 +244,17 @@
          contact.push(link(p.url)[#underline(p.url.replace("https://", "").replace("http://", ""))])
       }
     }
-    #text(size: 9pt)[#contact.join("  |  ")]
+    #text(size: 9pt)[
+      #for (i, item) in contact.enumerate() [
+        #if i > 0 [  |  ]#item
+      ]
+    ]
   ]
 
   // === SUMMARY ===
   if "summary" in data.basics and data.basics.summary != none [
     #data.basics.summary
   ]
-  v(0pt)
 
   // === RENDER SECTIONS IN ORDER ===
   for section in section-order {
