@@ -2,7 +2,6 @@
   set text(font: "Libertinus Serif", size: 10pt)
 
   // Extract configuration options with defaults
-  let show-header = if "showHeader" in data { data.showHeader } else { true }
   let show-page-numbers = if "showPageNumbers" in data { data.showPageNumbers } else { true }
 
   set page(
