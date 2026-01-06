@@ -876,8 +876,9 @@ mod tests {
                 certifications: vec![],
                 awards: vec![],
                 languages: vec![],
-                publications: None,
+                publications: vec![],
                 section_order: None,
+                section_titles: None,
             }),
         };
 

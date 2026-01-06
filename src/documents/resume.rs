@@ -43,12 +43,9 @@ pub struct Resume {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub languages: Vec<Language>,
 
-    /// Publications summary (free-form text)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(
-        description = "Free-form text describing publications, e.g., '11 peer-reviewed publications at EMNLP, IEEE TNNLS, IEEE Big Data, ACM CIKM on text moderation, hate speech detection, ad creative optimization, and graph neural networks'"
-    )]
-    pub publications: Option<String>,
+    /// Publications, papers, and patents
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publications: Vec<Publication>,
 
     /// Custom section ordering
     #[serde(
@@ -60,6 +57,17 @@ pub struct Resume {
         description = "Custom section ordering. Array of section names to display in order. Valid sections: 'education', 'experience', 'projects', 'certifications', 'awards', 'publications', 'skills', 'languages'. If not specified, uses default order. Omit a section from the list to hide it."
     )]
     pub section_order: Option<Vec<String>>,
+
+    /// Custom section titles
+    #[serde(
+        rename = "sectionTitles",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        description = "Custom section titles. Object mapping section names to custom titles. For example: {\"publications\": \"Related Publications\", \"skills\": \"Core Competencies\"}. Valid section names: 'education', 'experience', 'projects', 'certifications', 'awards', 'publications', 'skills', 'languages'."
+    )]
+    pub section_titles: Option<std::collections::HashMap<String, String>>,
 }
 
 /// A project entry
@@ -275,6 +283,39 @@ pub struct Language {
     pub fluency: Option<String>,
 }
 
+/// A publication entry
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[schemars(description = "A publication, paper, or patent")]
+pub struct Publication {
+    /// Publication title
+    pub title: String,
+
+    /// Authors (in order)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authors: Vec<String>,
+
+    /// Venue (journal, conference, or patent office)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        description = "Publication venue: journal name, conference name, or patent office (e.g., 'NeurIPS 2024', 'Nature', 'US Patent Office')"
+    )]
+    pub venue: Option<String>,
+
+    /// Publication date (YYYY-MM-DD or YYYY-MM format)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Publication date in YYYY-MM-DD or YYYY-MM format")]
+    pub date: Option<String>,
+
+    /// URL to the publication (DOI, arXiv, patent link, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(url, description = "URL to access the publication (DOI, arXiv, Google Scholar, patent link, etc.)")]
+    pub url: Option<String>,
+
+    /// Brief description or summary
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,8 +373,16 @@ mod tests {
                 language: "English".to_string(),
                 fluency: Some("Native".to_string()),
             }],
-            publications: Some("5 peer-reviewed publications at NeurIPS and ICML".to_string()),
+            publications: vec![Publication {
+                title: "Deep Learning for Natural Language Processing".to_string(),
+                authors: vec!["John Doe".to_string(), "Jane Smith".to_string()],
+                venue: Some("NeurIPS 2023".to_string()),
+                date: Some("2023-12".to_string()),
+                url: Some("https://arxiv.org/abs/2312.00000".to_string()),
+                summary: None,
+            }],
             section_order: None,
+            section_titles: None,
         };
 
         let json = serde_json::to_string_pretty(&resume).unwrap();
