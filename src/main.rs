@@ -123,7 +123,7 @@ async fn run_http_server() -> Result<(), Box<dyn std::error::Error>> {
                         (header::CONTENT_TYPE, "application/pdf"),
                         (
                             header::CONTENT_DISPOSITION,
-                            &format!("attachment; filename=\"{}\"", file.filename),
+                            &format!("inline; filename=\"{}\"", file.filename),
                         ),
                         (header::CACHE_CONTROL, "no-store, must-revalidate"),
                     ],

@@ -63,8 +63,9 @@ mod tests {
             certifications: vec![],
             awards: vec![],
             languages: vec![],
-            publications: None,
+            publications: vec![],
             section_order: None,
+            section_titles: None,
         };
 
         let result = transform_resume(&resume);
@@ -95,8 +96,9 @@ mod tests {
             certifications: vec![],
             awards: vec![],
             languages: vec![],
-            publications: None,
+            publications: vec![],
             section_order: None,
+            section_titles: None,
         };
 
         let source = transform_resume(&resume).unwrap();
@@ -128,12 +130,13 @@ mod tests {
             certifications: vec![],
             awards: vec![],
             languages: vec![],
-            publications: None,
+            publications: vec![],
             section_order: Some(vec![
                 "experience".to_string(),
                 "education".to_string(),
                 "skills".to_string(),
             ]),
+            section_titles: None,
         };
 
         let source = transform_resume(&resume).unwrap();

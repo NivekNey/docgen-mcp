@@ -6,8 +6,15 @@
   )
   set par(justify: true)
 
-  // Helper for section headers
-  let section-header(title) = {
+  // Helper for section headers with custom title support
+  let section-header(default-title, section-name: none) = {
+    let title = default-title
+    if section-name != none and "sectionTitles" in data and data.sectionTitles != none {
+      if section-name in data.sectionTitles {
+        title = data.sectionTitles.at(section-name)
+      }
+    }
+    v(0pt)
     text(size: 12pt, weight: "bold", smallcaps(title))
     v(-10pt)
     line(length: 100%, stroke: 0.5pt)
@@ -37,7 +44,7 @@
 
   let render-education() = {
     if "education" in data and data.education.len() > 0 [
-      #section-header("Education")
+      #section-header("Education", section-name: "education")
       #for edu in data.education [
         #block(breakable: false)[
           #entry-header(
@@ -65,7 +72,7 @@
 
   let render-experience() = {
     if "work" in data and data.work.len() > 0 [
-      #section-header("Experience")
+      #section-header("Experience", section-name: "experience")
       #for w in data.work [
         #block(breakable: false)[
           #entry-header(
@@ -90,7 +97,7 @@
 
   let render-projects() = {
     if "projects" in data and data.projects.len() > 0 [
-      #section-header("Projects")
+      #section-header("Projects", section-name: "projects")
       #for p in data.projects [
         #block(breakable: false)[
           #grid(
@@ -127,7 +134,7 @@
 
   let render-certifications() = {
     if "certifications" in data and data.certifications.len() > 0 [
-      #section-header("Certifications")
+      #section-header("Certifications", section-name: "certifications")
       #for cert in data.certifications [
         #block(breakable: false)[
           #grid(
@@ -152,7 +159,7 @@
 
   let render-awards() = {
     if "awards" in data and data.awards.len() > 0 [
-      #section-header("Awards")
+      #section-header("Awards", section-name: "awards")
       #for award in data.awards [
         #block(breakable: false)[
           #grid(
@@ -176,15 +183,39 @@
   }
 
   let render-publications() = {
-    if "publications" in data and data.publications != none [
-      #section-header("Publications")
-      #text[#data.publications]
+    if "publications" in data and data.publications.len() > 0 [
+      #section-header("Publications", section-name: "publications")
+      #for pub in data.publications [
+        #block(breakable: false)[
+          #grid(
+            columns: (1fr, auto),
+            [
+              *#pub.title*
+              #if "authors" in pub and pub.authors.len() > 0 [
+                \ #text(style: "italic", size: 9pt)[#pub.authors.join(", ")]
+              ]
+              #if "venue" in pub and pub.venue != none [
+                \ #text(size: 9pt)[#pub.venue]
+              ]
+              #if "url" in pub and pub.url != none [
+                \ #link(pub.url)[#underline(text(size: 9pt)[#pub.url.replace("https://", "").replace("http://", "")])]
+              ]
+            ],
+            align(right)[
+              #if "date" in pub and pub.date != none [#pub.date]
+            ]
+          )
+          #if "summary" in pub and pub.summary != none [
+            #text(size: 9pt)[#pub.summary]
+          ]
+        ]
+      ]
     ]
   }
 
   let render-skills() = {
     if "skills" in data and data.skills.len() > 0 [
-      #section-header("Technical Skills")
+      #section-header("Technical Skills", section-name: "skills")
       #for skill in data.skills [
         *#skill.name:* #skill.keywords.join(", ")
         #linebreak()
@@ -194,7 +225,7 @@
 
   let render-languages() = {
     if "languages" in data and data.languages.len() > 0 [
-      #section-header("Languages")
+      #section-header("Languages", section-name: "languages")
       #let lang-items = data.languages.map(lang => {
         if "fluency" in lang and lang.fluency != none [*#lang.language* (#lang.fluency)]
         else [*#lang.language*]
@@ -243,14 +274,17 @@
          contact.push(link(p.url)[#underline(p.url.replace("https://", "").replace("http://", ""))])
       }
     }
-    #text(size: 9pt)[#contact.join("  |  ")]
+    #text(size: 9pt)[
+      #for (i, item) in contact.enumerate() [
+        #if i > 0 [  |  ]#item
+      ]
+    ]
   ]
 
   // === SUMMARY ===
   if "summary" in data.basics and data.basics.summary != none [
     #data.basics.summary
   ]
-  v(0pt)
 
   // === RENDER SECTIONS IN ORDER ===
   for section in section-order {

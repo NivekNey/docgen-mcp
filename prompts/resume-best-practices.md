@@ -71,6 +71,19 @@ When a target job description is available:
 - Link to live demos or repositories when available
 - Highlight your specific contributions in team projects
 
+### Publications (optional, mainly for research/academic roles)
+- List papers, patents, or significant technical publications
+- Include all authors in order (can list as "First Author et al." if many)
+- Specify the venue (conference, journal, or patent office)
+- Include publication date and links to DOI, arXiv, or patent databases
+- Add brief summary only if the title isn't self-explanatory
+- Order by relevance or reverse chronological order
+
+### Section Customization
+- Use `sectionOrder` to control which sections appear and in what order
+- Use `sectionTitles` to customize section headers (e.g., "Related Publications" instead of "Publications", "Core Competencies" instead of "Technical Skills")
+- Valid section names: education, experience, projects, certifications, awards, publications, skills, languages
+
 ## Role-Specific Emphasis
 
 Tailor emphasis based on the type of role:
@@ -119,8 +132,9 @@ When generating the resume JSON, follow this schema exactly:
 - **profiles**: Include network name and URL (e.g., LinkedIn, GitHub)
 - **highlights**: Use action verbs and quantify when possible
 - **skills**: Group related skills together with a descriptive name
-- **publications**: Free-form text for academic or professional publications
+- **publications**: Array of publication objects with title, authors, venue, date, url, and optional summary
 - **sectionOrder**: Customize the order of sections (e.g., `["experience", "education", "skills"]`)
+- **sectionTitles**: Customize section headers (e.g., `{"publications": "Related Publications", "skills": "Core Competencies"}`)
 
 ## Workflow
 
