@@ -1,6 +1,6 @@
 # docgen-mcp
 
-A type-safe document generation framework for AI agents, powered by [Typst](https://typst.app) and the Model Context Protocol (MCP). Generate professional resumes, cover letters, and more through structured JSON with automatic validation and PDF compilation.
+A type-safe document generation framework for AI agents, powered by [Typst](https://crates.io/crates/typst) and the Model Context Protocol (MCP). Generate professional resumes, cover letters, and more through structured JSON with automatic validation and PDF compilation.
 
 ## Overview
 
