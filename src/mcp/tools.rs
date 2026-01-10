@@ -2,10 +2,9 @@
 //!
 //! This module provides MCP tools for validating and generating documents.
 //! Currently implements:
-//! - `get_resume_schema` - Returns the JSON schema for resume structure
-//! - `get_resume_best_practices` - Returns best practices for resume writing
-//! - `validate_resume` - Validates JSON payload against resume schema
-//! - `generate_resume` - Generates a PDF from a resume JSON payload
+//! - Document type discovery
+//! - Resume tools (schema, best practices, validate, generate)
+//! - Cover letter tools (schema, best practices, validate, generate)
 
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
@@ -13,11 +12,17 @@ use serde_json::Value;
 use std::fs;
 use std::sync::Arc;
 
-use crate::documents::Resume;
+use crate::documents::{CoverLetter, Resume};
 use crate::mcp::{prompts, resources};
 use crate::storage::FileStorage;
 use crate::typst::compiler::compile;
-use crate::typst::transform::transform_resume;
+use crate::typst::transform::{transform_cover_letter, transform_resume};
+
+/// Tool name for discovering available document types
+pub const GET_DOCUMENT_TYPES_TOOL: &str = "get_document_types";
+
+/// Tool name for getting document type guide
+pub const GET_DOCUMENT_TYPE_GUIDE_TOOL: &str = "get_document_type_guide";
 
 /// Tool name for getting resume schema
 pub const GET_RESUME_SCHEMA_TOOL: &str = "get_resume_schema";
@@ -30,6 +35,18 @@ pub const VALIDATE_RESUME_TOOL: &str = "validate_resume";
 
 /// Tool name for resume generation
 pub const GENERATE_RESUME_TOOL: &str = "generate_resume";
+
+/// Tool name for getting cover letter schema
+pub const GET_COVER_LETTER_SCHEMA_TOOL: &str = "get_cover_letter_schema";
+
+/// Tool name for getting cover letter best practices
+pub const GET_COVER_LETTER_BEST_PRACTICES_TOOL: &str = "get_cover_letter_best_practices";
+
+/// Tool name for cover letter validation
+pub const VALIDATE_COVER_LETTER_TOOL: &str = "validate_cover_letter";
+
+/// Tool name for cover letter generation
+pub const GENERATE_COVER_LETTER_TOOL: &str = "generate_cover_letter";
 
 /// Context for tool execution (passed from server)
 pub struct ToolContext {
@@ -129,7 +146,23 @@ pub fn list_tools() -> Vec<Tool> {
     empty_schema_map.insert("properties".to_string(), Value::Object(serde_json::Map::new()));
     let empty_schema = Arc::new(empty_schema_map);
 
-    // Schema for validate_resume (resume only)
+    // ========== DOCUMENT TYPE DISCOVERY TOOLS ==========
+
+    let get_document_types_tool = Tool::new(
+        GET_DOCUMENT_TYPES_TOOL,
+        "Returns information about all available document types (resume, cover letter, CV). Shows what each document is for, when to use it, and which tools are available for each type. RECOMMENDED: Call this FIRST when helping users with professional documents to understand which document type fits their needs.",
+        empty_schema.clone(),
+    );
+
+    let get_document_type_guide_tool = Tool::new(
+        GET_DOCUMENT_TYPE_GUIDE_TOOL,
+        "Returns a comprehensive guide explaining the differences between resume, CV, and cover letter, with detailed guidance on when to use each. Includes decision trees, common confusions, and workflow recommendations. Use this to help users understand which document(s) they need for their specific situation.",
+        empty_schema.clone(),
+    );
+
+    // ========== RESUME TOOLS ==========
+
+    // Schema for validate_resume
     let mut resume_prop = serde_json::Map::new();
     resume_prop.insert("type".to_string(), Value::String("object".to_string()));
     resume_prop.insert(
@@ -137,68 +170,142 @@ pub fn list_tools() -> Vec<Tool> {
         Value::String("The resume JSON payload. Use 'get_resume_schema' tool to see the full schema structure.".to_string()),
     );
 
-    let mut validate_properties = serde_json::Map::new();
-    validate_properties.insert("resume".to_string(), Value::Object(resume_prop.clone()));
+    let mut validate_resume_properties = serde_json::Map::new();
+    validate_resume_properties.insert("resume".to_string(), Value::Object(resume_prop.clone()));
 
-    let mut validate_schema = serde_json::Map::new();
-    validate_schema.insert("type".to_string(), Value::String("object".to_string()));
-    validate_schema.insert("properties".to_string(), Value::Object(validate_properties));
-    validate_schema.insert(
+    let mut validate_resume_schema = serde_json::Map::new();
+    validate_resume_schema.insert("type".to_string(), Value::String("object".to_string()));
+    validate_resume_schema.insert("properties".to_string(), Value::Object(validate_resume_properties));
+    validate_resume_schema.insert(
         "required".to_string(),
         Value::Array(vec![Value::String("resume".to_string())]),
     );
 
-    let validate_schema_arc = Arc::new(validate_schema);
+    let validate_resume_schema_arc = Arc::new(validate_resume_schema);
 
-    // Schema for generate_resume (resume + optional filename)
+    // Schema for generate_resume
     let mut filename_prop = serde_json::Map::new();
     filename_prop.insert("type".to_string(), Value::String("string".to_string()));
     filename_prop.insert(
         "description".to_string(),
-        Value::String("Optional filename for the generated PDF (e.g., 'john-doe-resume.pdf'). If not provided, a default name will be generated based on the resume name.".to_string()),
+        Value::String("Optional filename for the generated PDF (e.g., 'john-doe-resume.pdf'). If not provided, a default name will be generated.".to_string()),
     );
 
-    let mut generate_properties = serde_json::Map::new();
-    generate_properties.insert("resume".to_string(), Value::Object(resume_prop));
-    generate_properties.insert("filename".to_string(), Value::Object(filename_prop));
+    let mut generate_resume_properties = serde_json::Map::new();
+    generate_resume_properties.insert("resume".to_string(), Value::Object(resume_prop));
+    generate_resume_properties.insert("filename".to_string(), Value::Object(filename_prop.clone()));
 
-    let mut generate_schema = serde_json::Map::new();
-    generate_schema.insert("type".to_string(), Value::String("object".to_string()));
-    generate_schema.insert("properties".to_string(), Value::Object(generate_properties));
-    generate_schema.insert(
+    let mut generate_resume_schema = serde_json::Map::new();
+    generate_resume_schema.insert("type".to_string(), Value::String("object".to_string()));
+    generate_resume_schema.insert("properties".to_string(), Value::Object(generate_resume_properties));
+    generate_resume_schema.insert(
         "required".to_string(),
         Value::Array(vec![Value::String("resume".to_string())]),
     );
 
-    let generate_schema_arc = Arc::new(generate_schema);
+    let generate_resume_schema_arc = Arc::new(generate_resume_schema);
 
-    // Convenience tools for discovery
-    let get_schema_tool = Tool::new(
+    let get_resume_schema_tool = Tool::new(
         GET_RESUME_SCHEMA_TOOL,
-        "Returns the complete JSON Schema for resume documents. Use this to understand the exact structure, required fields, and data types expected by validate_resume and generate_resume. This is a convenience wrapper around the 'docgen://schemas/resume' resource.",
+        "Returns the complete JSON Schema for resume documents. Use this to understand the exact structure, required fields, and data types expected by validate_resume and generate_resume.",
         empty_schema.clone(),
     );
 
-    let get_best_practices_tool = Tool::new(
+    let get_resume_best_practices_tool = Tool::new(
         GET_RESUME_BEST_PRACTICES_TOOL,
-        "Returns comprehensive best practices and guidelines for writing effective resume content. Includes writing tips, job description alignment strategies, content guidelines for each section, and the workflow for creating high-quality resumes. Call this BEFORE gathering user information to understand what makes a great resume. This is a convenience wrapper around the 'resume-best-practices' prompt.",
+        "Returns comprehensive best practices and guidelines for writing effective resume content. Call this BEFORE gathering user information to understand what makes a great resume.",
+        empty_schema.clone(),
+    );
+
+    let validate_resume_tool = Tool::new(
+        VALIDATE_RESUME_TOOL,
+        "Validates a resume JSON payload against the schema without generating a document. Returns validation errors with paths if invalid.",
+        validate_resume_schema_arc,
+    );
+
+    let generate_resume_tool = Tool::new(
+        GENERATE_RESUME_TOOL,
+        "Generates a professionally formatted PDF resume from a JSON payload. Returns file path or download URL depending on the environment. RECOMMENDED: Use 'validate_resume' before generating.",
+        generate_resume_schema_arc,
+    );
+
+    // ========== COVER LETTER TOOLS ==========
+
+    // Schema for validate_cover_letter
+    let mut cover_letter_prop = serde_json::Map::new();
+    cover_letter_prop.insert("type".to_string(), Value::String("object".to_string()));
+    cover_letter_prop.insert(
+        "description".to_string(),
+        Value::String("The cover letter JSON payload. Use 'get_cover_letter_schema' tool to see the full schema structure.".to_string()),
+    );
+
+    let mut validate_cover_letter_properties = serde_json::Map::new();
+    validate_cover_letter_properties.insert("cover_letter".to_string(), Value::Object(cover_letter_prop.clone()));
+
+    let mut validate_cover_letter_schema = serde_json::Map::new();
+    validate_cover_letter_schema.insert("type".to_string(), Value::String("object".to_string()));
+    validate_cover_letter_schema.insert("properties".to_string(), Value::Object(validate_cover_letter_properties));
+    validate_cover_letter_schema.insert(
+        "required".to_string(),
+        Value::Array(vec![Value::String("cover_letter".to_string())]),
+    );
+
+    let validate_cover_letter_schema_arc = Arc::new(validate_cover_letter_schema);
+
+    // Schema for generate_cover_letter
+    let mut generate_cover_letter_properties = serde_json::Map::new();
+    generate_cover_letter_properties.insert("cover_letter".to_string(), Value::Object(cover_letter_prop));
+    generate_cover_letter_properties.insert("filename".to_string(), Value::Object(filename_prop));
+
+    let mut generate_cover_letter_schema = serde_json::Map::new();
+    generate_cover_letter_schema.insert("type".to_string(), Value::String("object".to_string()));
+    generate_cover_letter_schema.insert("properties".to_string(), Value::Object(generate_cover_letter_properties));
+    generate_cover_letter_schema.insert(
+        "required".to_string(),
+        Value::Array(vec![Value::String("cover_letter".to_string())]),
+    );
+
+    let generate_cover_letter_schema_arc = Arc::new(generate_cover_letter_schema);
+
+    let get_cover_letter_schema_tool = Tool::new(
+        GET_COVER_LETTER_SCHEMA_TOOL,
+        "Returns the complete JSON Schema for cover letter documents. Use this to understand the exact structure, required fields, and data types expected by validate_cover_letter and generate_cover_letter.",
+        empty_schema.clone(),
+    );
+
+    let get_cover_letter_best_practices_tool = Tool::new(
+        GET_COVER_LETTER_BEST_PRACTICES_TOOL,
+        "Returns comprehensive best practices and guidelines for writing compelling cover letters. Call this BEFORE gathering user information to understand what makes a great cover letter.",
         empty_schema,
     );
 
-    // Validation and generation tools
-    let validate_tool = Tool::new(
-        VALIDATE_RESUME_TOOL,
-        "Validates a resume JSON payload against the schema without generating a document. Returns validation errors with paths if invalid, or confirms validity. TIP: Use 'get_resume_schema' first to understand the expected structure.",
-        validate_schema_arc,
+    let validate_cover_letter_tool = Tool::new(
+        VALIDATE_COVER_LETTER_TOOL,
+        "Validates a cover letter JSON payload against the schema without generating a document. Returns validation errors with paths if invalid.",
+        validate_cover_letter_schema_arc,
     );
 
-    let generate_tool = Tool::new(
-        GENERATE_RESUME_TOOL,
-        "Generates a professionally formatted PDF resume from a JSON payload. Returns both the file path (for local usage) and base64-encoded PDF content (for remote MCP usage). Optionally accepts a 'filename' parameter (e.g., 'john-doe-resume.pdf'). RECOMMENDED: First use 'get_resume_best_practices' for writing guidance and 'get_resume_schema' for structure, then 'validate_resume' before generating.",
-        generate_schema_arc,
+    let generate_cover_letter_tool = Tool::new(
+        GENERATE_COVER_LETTER_TOOL,
+        "Generates a professionally formatted PDF cover letter from a JSON payload. Returns file path or download URL depending on the environment. RECOMMENDED: Use 'validate_cover_letter' before generating.",
+        generate_cover_letter_schema_arc,
     );
 
-    vec![get_schema_tool, get_best_practices_tool, validate_tool, generate_tool]
+    vec![
+        // Document type discovery (call these first!)
+        get_document_types_tool,
+        get_document_type_guide_tool,
+        // Resume tools
+        get_resume_schema_tool,
+        get_resume_best_practices_tool,
+        validate_resume_tool,
+        generate_resume_tool,
+        // Cover letter tools
+        get_cover_letter_schema_tool,
+        get_cover_letter_best_practices_tool,
+        validate_cover_letter_tool,
+        generate_cover_letter_tool,
+    ]
 }
 
 /// Returns the JSON schema for resume documents
@@ -375,6 +482,9 @@ pub async fn generate_resume(input: Value, context: &ToolContext) -> GenerationR
                 download_url: Some(download_url.clone()),
                 message: format!(
                     "Resume successfully generated. Download it from: {}\n\
+                     \n\
+                     NOTE: You are likely running in a sandboxed environment and cannot access local files directly. \
+                     Please provide this URL to the user so they can download the PDF. \
                      This link will expire in 1 hour.",
                     download_url
                 ),
@@ -386,7 +496,13 @@ pub async fn generate_resume(input: Value, context: &ToolContext) -> GenerationR
                 Ok(_) => GenerationResult::Success {
                     file_path: Some(filename.clone()),
                     download_url: None,
-                    message: format!("Resume successfully generated and saved to '{}'", filename),
+                    message: format!(
+                        "Resume successfully generated and saved to '{}'\n\
+                         \n\
+                         NOTE: If you are running in a sandboxed environment, you may not have direct access to this file. \
+                         The file path is provided for reference, but the user should check their working directory.",
+                        filename
+                    ),
                 },
                 Err(e) => GenerationResult::Error {
                     message: format!("Failed to write PDF to file '{}': {}", filename, e),
@@ -491,9 +607,361 @@ fn infer_path_from_context(message: &str, field: &str) -> String {
     field.to_string()
 }
 
+// ============================================================================
+// COVER LETTER TOOLS
+// ============================================================================
+
+/// Returns the JSON schema for cover letter documents
+pub fn get_cover_letter_schema() -> Value {
+    match resources::read_resource(resources::COVER_LETTER_SCHEMA_URI) {
+        Some(rmcp::model::ResourceContents::TextResourceContents { text, .. }) => {
+            serde_json::from_str(&text).unwrap_or_else(|_| {
+                serde_json::json!({
+                    "error": "Failed to parse schema"
+                })
+            })
+        }
+        _ => serde_json::json!({
+            "error": "Schema resource not found"
+        }),
+    }
+}
+
+/// Returns best practices and guidelines for cover letter writing
+pub fn get_cover_letter_best_practices() -> Value {
+    match prompts::get_prompt(prompts::COVER_LETTER_BEST_PRACTICES_PROMPT) {
+        Some(prompt_result) => {
+            if let Some(msg) = prompt_result.messages.first()
+                && let rmcp::model::PromptMessageContent::Text { text } = &msg.content
+            {
+                return serde_json::json!({
+                    "best_practices": text,
+                    "description": prompt_result.description
+                });
+            }
+            serde_json::json!({
+                "error": "Failed to extract prompt content"
+            })
+        }
+        None => serde_json::json!({
+            "error": "Best practices prompt not found"
+        }),
+    }
+}
+
+/// Input for the validate_cover_letter tool
+#[derive(Debug, Deserialize)]
+pub struct ValidateCoverLetterInput {
+    pub cover_letter: Value,
+}
+
+/// Input for the generate_cover_letter tool
+#[derive(Debug, Deserialize)]
+pub struct GenerateCoverLetterInput {
+    pub cover_letter: Value,
+    pub filename: Option<String>,
+}
+
+/// Result of cover letter validation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum CoverLetterValidationResult {
+    #[serde(rename = "valid")]
+    Valid {
+        cover_letter: Box<CoverLetter>,
+    },
+    #[serde(rename = "invalid")]
+    Invalid {
+        errors: Vec<ValidationError>,
+    },
+}
+
+/// Validates a cover letter JSON payload
+pub fn validate_cover_letter(input: Value) -> CoverLetterValidationResult {
+    let parsed_input: ValidateCoverLetterInput = match serde_json::from_value(input.clone()) {
+        Ok(v) => v,
+        Err(e) => {
+            return CoverLetterValidationResult::Invalid {
+                errors: vec![ValidationError::new(
+                    "",
+                    format!(
+                        "Invalid tool input: expected object with 'cover_letter' field. {}",
+                        e
+                    ),
+                )],
+            };
+        }
+    };
+
+    match serde_json::from_value::<CoverLetter>(parsed_input.cover_letter) {
+        Ok(cover_letter) => CoverLetterValidationResult::Valid {
+            cover_letter: Box::new(cover_letter),
+        },
+        Err(e) => CoverLetterValidationResult::Invalid {
+            errors: parse_serde_error_cover_letter(&e),
+        },
+    }
+}
+
+/// Parse serde errors for cover letters
+fn parse_serde_error_cover_letter(error: &serde_json::Error) -> Vec<ValidationError> {
+    let message = error.to_string();
+
+    if let Some(field) = extract_missing_field(&message) {
+        return vec![ValidationError::new(
+            infer_path_from_context_cover_letter(&message, &field),
+            format!("Missing required field: {}", field),
+        )];
+    }
+
+    if message.contains("invalid type") {
+        let path = extract_path_hint_cover_letter(&message);
+        return vec![ValidationError::new(path, message.clone())];
+    }
+
+    if message.contains("unknown field") {
+        let path = extract_path_hint_cover_letter(&message);
+        return vec![ValidationError::new(path, message.clone())];
+    }
+
+    vec![ValidationError::new("", message)]
+}
+
+fn extract_path_hint_cover_letter(message: &str) -> String {
+    let type_hints = ["ContactInfo", "Recipient", "CoverLetter"];
+
+    for hint in type_hints {
+        if message.contains(hint) {
+            return hint.to_lowercase();
+        }
+    }
+
+    String::new()
+}
+
+fn infer_path_from_context_cover_letter(message: &str, field: &str) -> String {
+    if message.contains("ContactInfo") {
+        return format!("sender.{}", field);
+    }
+    if message.contains("Recipient") {
+        return format!("recipient.{}", field);
+    }
+
+    field.to_string()
+}
+
+/// Generates a PDF cover letter from a JSON payload
+pub async fn generate_cover_letter(input: Value, context: &ToolContext) -> GenerationResult {
+    let parsed_input: GenerateCoverLetterInput = match serde_json::from_value(input.clone()) {
+        Ok(v) => v,
+        Err(e) => {
+            return GenerationResult::Error {
+                message: format!(
+                    "Invalid tool input: expected object with 'cover_letter' field. {}",
+                    e
+                ),
+                validation_errors: None,
+            };
+        }
+    };
+
+    let validation_input = serde_json::json!({ "cover_letter": parsed_input.cover_letter });
+    let validation_result = validate_cover_letter(validation_input);
+
+    let cover_letter = match validation_result {
+        CoverLetterValidationResult::Valid { cover_letter } => cover_letter,
+        CoverLetterValidationResult::Invalid { errors } => {
+            return GenerationResult::Error {
+                message: "Validation failed".to_string(),
+                validation_errors: Some(errors),
+            };
+        }
+    };
+
+    let source = match transform_cover_letter(&cover_letter) {
+        Ok(s) => s,
+        Err(e) => {
+            return GenerationResult::Error {
+                message: format!("Failed to transform cover letter to Typst: {}", e),
+                validation_errors: None,
+            };
+        }
+    };
+
+    let pdf_bytes = match compile(source) {
+        Ok(bytes) => bytes,
+        Err(diags) => {
+            let msg = diags
+                .iter()
+                .map(|d| format!("{:?}: {}", d.severity, d.message))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return GenerationResult::Error {
+                message: format!("Typst compilation failed:\n{}", msg),
+                validation_errors: None,
+            };
+        }
+    };
+
+    let filename = parsed_input.filename.unwrap_or_else(|| {
+        let name = &cover_letter.sender.name;
+        let company = &cover_letter.recipient.company;
+        let sanitized_name = name
+            .to_lowercase()
+            .replace(" ", "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>();
+        let sanitized_company = company
+            .to_lowercase()
+            .replace(" ", "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>();
+        format!("{}-{}-cover-letter.pdf", sanitized_name, sanitized_company)
+    });
+
+    match (&context.file_storage, &context.base_url) {
+        (Some(storage), Some(base_url)) => {
+            let file_id = storage.store(pdf_bytes, filename.clone()).await;
+            let download_url = format!("{}/files/{}", base_url, file_id);
+
+            GenerationResult::Success {
+                file_path: None,
+                download_url: Some(download_url.clone()),
+                message: format!(
+                    "Cover letter successfully generated. Download it from: {}\n\
+                     \n\
+                     NOTE: You are likely running in a sandboxed environment and cannot access local files directly. \
+                     Please provide this URL to the user so they can download the PDF. \
+                     This link will expire in 1 hour.",
+                    download_url
+                ),
+            }
+        }
+        _ => match fs::write(&filename, pdf_bytes) {
+            Ok(_) => GenerationResult::Success {
+                file_path: Some(filename.clone()),
+                download_url: None,
+                message: format!(
+                    "Cover letter successfully generated and saved to '{}'\n\
+                     \n\
+                     NOTE: If you are running in a sandboxed environment, you may not have direct access to this file. \
+                     The file path is provided for reference, but the user should check their working directory.",
+                    filename
+                ),
+            },
+            Err(e) => GenerationResult::Error {
+                message: format!("Failed to write PDF to file '{}': {}", filename, e),
+                validation_errors: None,
+            },
+        },
+    }
+}
+
+// ============================================================================
+// DOCUMENT TYPE DISCOVERY TOOLS
+// ============================================================================
+
+/// Returns information about available document types
+pub fn get_document_types() -> Value {
+    serde_json::json!({
+        "document_types": [
+            {
+                "name": "resume",
+                "display_name": "Resume",
+                "description": "A concise (1-2 page) summary of professional experience, skills, and education. Standard for industry jobs in North America.",
+                "use_cases": [
+                    "Applying for industry positions (tech, business, non-profit, etc.)",
+                    "Networking events or job fairs",
+                    "Quick professional snapshot",
+                    "Non-academic roles in USA/Canada"
+                ],
+                "tools": {
+                    "get_schema": "get_resume_schema",
+                    "get_best_practices": "get_resume_best_practices",
+                    "validate": "validate_resume",
+                    "generate": "generate_resume"
+                }
+            },
+            {
+                "name": "cover_letter",
+                "display_name": "Cover Letter",
+                "description": "A one-page letter introducing yourself and explaining why you're interested in and qualified for a specific position at a specific company.",
+                "use_cases": [
+                    "Accompanying a resume/CV for job applications",
+                    "Expressing interest in a company",
+                    "Explaining career transitions or gaps",
+                    "Networking introductions",
+                    "Graduate school applications"
+                ],
+                "tools": {
+                    "get_schema": "get_cover_letter_schema",
+                    "get_best_practices": "get_cover_letter_best_practices",
+                    "validate": "validate_cover_letter",
+                    "generate": "generate_cover_letter"
+                }
+            },
+            {
+                "name": "cv",
+                "display_name": "CV (Curriculum Vitae)",
+                "description": "A comprehensive document listing entire academic and professional history. Used in academic/research fields and standard for international applications.",
+                "use_cases": [
+                    "Academic positions (professor, researcher, postdoc)",
+                    "Research grants and fellowships",
+                    "Medical residencies and faculty positions",
+                    "International applications (Europe, Asia, Africa)",
+                    "Graduate programs (PhD, some Master's)"
+                ],
+                "status": "not_implemented",
+                "note": "CV generation is planned for future releases. For now, use 'resume' with the Publications section for academic positions."
+            }
+        ],
+        "recommendations": {
+            "industry_job_us": ["resume", "cover_letter"],
+            "academic_job": ["cv", "cover_letter"],
+            "industry_job_international": ["cv", "cover_letter"],
+            "networking": ["resume"]
+        },
+        "tip": "Use the 'get_document_type_guide' tool for detailed guidance on choosing the right document type."
+    })
+}
+
+/// Returns the document type guide
+pub fn get_document_type_guide() -> Value {
+    match prompts::get_prompt(prompts::DOCUMENT_TYPE_GUIDE_PROMPT) {
+        Some(prompt_result) => {
+            if let Some(msg) = prompt_result.messages.first()
+                && let rmcp::model::PromptMessageContent::Text { text } = &msg.content
+            {
+                return serde_json::json!({
+                    "guide": text,
+                    "description": prompt_result.description
+                });
+            }
+            serde_json::json!({
+                "error": "Failed to extract prompt content"
+            })
+        }
+        None => serde_json::json!({
+            "error": "Document type guide not found"
+        }),
+    }
+}
+
 /// Execute a tool by name with the given arguments
 pub async fn call_tool(name: &str, arguments: Value, context: &ToolContext) -> Result<Value, String> {
     match name {
+        // Document type discovery tools
+        GET_DOCUMENT_TYPES_TOOL => {
+            let _ = arguments;
+            Ok(get_document_types())
+        }
+        GET_DOCUMENT_TYPE_GUIDE_TOOL => {
+            let _ = arguments;
+            Ok(get_document_type_guide())
+        }
+        // Resume tools
         GET_RESUME_SCHEMA_TOOL => {
             let _ = arguments; // Schema tool takes no arguments
             Ok(get_resume_schema())
@@ -508,6 +976,23 @@ pub async fn call_tool(name: &str, arguments: Value, context: &ToolContext) -> R
         }
         GENERATE_RESUME_TOOL => {
             let result = generate_resume(arguments, context).await;
+            serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
+        }
+        // Cover letter tools
+        GET_COVER_LETTER_SCHEMA_TOOL => {
+            let _ = arguments;
+            Ok(get_cover_letter_schema())
+        }
+        GET_COVER_LETTER_BEST_PRACTICES_TOOL => {
+            let _ = arguments;
+            Ok(get_cover_letter_best_practices())
+        }
+        VALIDATE_COVER_LETTER_TOOL => {
+            let result = validate_cover_letter(arguments);
+            serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
+        }
+        GENERATE_COVER_LETTER_TOOL => {
+            let result = generate_cover_letter(arguments, context).await;
             serde_json::to_value(result).map_err(|e| format!("Failed to serialize result: {}", e))
         }
         _ => Err(format!("Unknown tool: {}", name)),

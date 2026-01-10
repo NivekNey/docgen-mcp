@@ -3,19 +3,29 @@
 //! This module provides functions for MCP resource discovery and retrieval.
 //! Resources expose JSON schemas generated from Rust types.
 
-use crate::documents::Resume;
+use crate::documents::{CoverLetter, Resume};
 use rmcp::model::{AnnotateAble, RawResource, Resource, ResourceContents};
 
 /// URI for the resume schema resource
 pub const RESUME_SCHEMA_URI: &str = "docgen://schemas/resume";
 
+/// URI for the cover letter schema resource
+pub const COVER_LETTER_SCHEMA_URI: &str = "docgen://schemas/cover-letter";
+
 /// Returns a list of all available resources
 pub fn list_resources() -> Vec<Resource> {
-    let mut resource = RawResource::new(RESUME_SCHEMA_URI, "Resume Schema");
-    resource.description = Some("JSON Schema for resume documents".to_string());
-    resource.mime_type = Some("application/schema+json".to_string());
+    let mut resume_resource = RawResource::new(RESUME_SCHEMA_URI, "Resume Schema");
+    resume_resource.description = Some("JSON Schema for resume documents".to_string());
+    resume_resource.mime_type = Some("application/schema+json".to_string());
 
-    vec![resource.no_annotation()]
+    let mut cover_letter_resource = RawResource::new(COVER_LETTER_SCHEMA_URI, "Cover Letter Schema");
+    cover_letter_resource.description = Some("JSON Schema for cover letter documents".to_string());
+    cover_letter_resource.mime_type = Some("application/schema+json".to_string());
+
+    vec![
+        resume_resource.no_annotation(),
+        cover_letter_resource.no_annotation(),
+    ]
 }
 
 /// Reads a resource by URI and returns its contents
@@ -23,6 +33,18 @@ pub fn read_resource(uri: &str) -> Option<ResourceContents> {
     match uri {
         RESUME_SCHEMA_URI => {
             let schema = schemars::schema_for!(Resume);
+            let schema_json =
+                serde_json::to_string_pretty(&schema).expect("Failed to serialize schema");
+
+            Some(ResourceContents::TextResourceContents {
+                uri: uri.to_string(),
+                mime_type: Some("application/schema+json".to_string()),
+                text: schema_json,
+                meta: None,
+            })
+        }
+        COVER_LETTER_SCHEMA_URI => {
+            let schema = schemars::schema_for!(CoverLetter);
             let schema_json =
                 serde_json::to_string_pretty(&schema).expect("Failed to serialize schema");
 

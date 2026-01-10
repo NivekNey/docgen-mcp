@@ -1,14 +1,21 @@
 # docgen-mcp
 
-A Model Context Protocol (MCP) server for programmatic document generation, powered by [Typst](https://typst.app). Currently focused on resume/CV generation with plans to expand to other document types.
+A type-safe document generation framework for AI agents, powered by [Typst](https://typst.app) and the Model Context Protocol (MCP). Generate professional resumes, cover letters, and more through structured JSON with automatic validation and PDF compilation.
 
 ## Overview
 
-docgen-mcp provides a structured approach to document generation through MCP:
+docgen-mcp is a **code-first document generation framework** that makes it easy for AI agents to create professionally formatted documents:
 
-- **Resources** — Exposes JSON schemas describing the structure of each document type
-- **Prompts** — Best practices and guidelines for creating effective documents
-- **Tools** — Validates payloads against schemas and generates typeset PDFs
+- **Type-Safe** — Document structures defined as Rust types with automatic JSON Schema generation
+- **AI-Optimized** — Discovery tools, best practices prompts, and sandbox-aware file handling
+- **Professional Output** — Typst-powered PDF generation with production-quality templates
+- **Extensible** — Add new document types by defining Rust types and Typst templates
+
+### Document Types
+
+- ✅ **Resume** — 1-2 page professional summary (industry standard in North America)
+- ✅ **Cover Letter** — One-page personalized application letter
+- 🔲 **CV** — Comprehensive academic/research document (planned)
 
 ```mermaid
 sequenceDiagram
@@ -116,79 +123,54 @@ Note: Claude Desktop uses stdio transport, while Claude.ai uses HTTP/SSE transpo
 | URI | Description |
 |-----|-------------|
 | `docgen://schemas/resume` | JSON Schema for resume documents |
-
-Example schema (simplified):
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Resume",
-  "type": "object",
-  "required": ["basics", "work"],
-  "properties": {
-    "basics": {
-      "type": "object",
-      "required": ["name", "email"],
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "phone": { "type": "string" },
-        "location": { "type": "string" },
-        "summary": { "type": "string" },
-        "profiles": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "network": { "type": "string" },
-              "url": { "type": "string", "format": "uri" }
-            }
-          }
-        }
-      }
-    },
-    "work": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["company", "position"],
-        "properties": {
-          "company": { "type": "string" },
-          "position": { "type": "string" },
-          "startDate": { "type": "string", "format": "date" },
-          "endDate": { "type": "string" },
-          "highlights": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    },
-    "education": { "type": "array" },
-    "skills": { "type": "array" },
-    "publications": { "type": "string", "description": "Free-form text describing publications" }
-  }
-}
-```
+| `docgen://schemas/cover-letter` | JSON Schema for cover letter documents |
 
 ### Prompts
 
 | Name | Description |
 |------|-------------|
 | `resume-best-practices` | Guidelines for writing effective resume content |
+| `cover-letter-best-practices` | Guidelines for writing compelling cover letters |
+| `document-type-guide` | Guide to choosing between resume, CV, and cover letter |
 
 ### Tools
 
+#### Document Type Discovery
+
 | Name | Description |
 |------|-------------|
-| `get_resume_schema` | Returns the complete JSON Schema for resume documents (convenience wrapper for `docgen://schemas/resume` resource) |
-| `get_resume_best_practices` | Returns comprehensive resume writing guidelines (convenience wrapper for `resume-best-practices` prompt) |
-| `validate_resume` | Validates a JSON payload against the schema without generating a document |
-| `generate_resume` | Generates a PDF resume from JSON payload and saves it to a file. Accepts optional `filename` parameter |
+| `get_document_types` | Returns information about all available document types (resume, cover letter, CV). **Call this FIRST** to understand which document type fits the user's needs. |
+| `get_document_type_guide` | Returns comprehensive guide explaining differences between document types with decision trees and workflows. |
+
+#### Resume Tools
+
+| Name | Description |
+|------|-------------|
+| `get_resume_schema` | Returns the complete JSON Schema for resume documents |
+| `get_resume_best_practices` | Returns comprehensive resume writing guidelines |
+| `validate_resume` | Validates a resume JSON payload against the schema |
+| `generate_resume` | Generates a PDF resume from JSON payload (accepts optional `filename` parameter) |
+
+#### Cover Letter Tools
+
+| Name | Description |
+|------|-------------|
+| `get_cover_letter_schema` | Returns the complete JSON Schema for cover letter documents |
+| `get_cover_letter_best_practices` | Returns comprehensive cover letter writing guidelines |
+| `validate_cover_letter` | Validates a cover letter JSON payload against the schema |
+| `generate_cover_letter` | Generates a PDF cover letter from JSON payload (accepts optional `filename` parameter) |
 
 **Recommended Workflow for AI Agents:**
-1. Call `get_resume_best_practices` to understand resume writing guidelines
-2. Call `get_resume_schema` to see the expected JSON structure
-3. Gather information from the user and construct the resume JSON
-4. Call `validate_resume` to check the structure
-5. Call `generate_resume` to create the PDF file
+
+1. **Discover** — Call `get_document_types` to understand which document(s) the user needs
+2. **Learn** — Call the appropriate `get_X_best_practices` tool to understand content guidelines
+3. **Structure** — Call `get_X_schema` to see the expected JSON structure
+4. **Gather** — Collect information from the user and construct the JSON
+5. **Validate** — Call `validate_X` to check the structure before generating
+6. **Generate** — Call `generate_X` to create the PDF file
+
+**Note on Sandbox Environments:**
+Generated PDFs return either a file path (local mode) or a download URL (remote mode). AI agents running in sandboxed environments should provide the URL to users rather than attempting to access files directly.
 
 ## Project Structure
 
@@ -537,11 +519,12 @@ The generated JSON Schema is exposed via the `docgen://schemas/resume` resource 
 
 ## Future Ideas
 
-- **Additional document types** — Cover letters, invoices, reports
+- **Additional document types** — CVs (academic), invoices, reports, proposals, case studies
 - **Template marketplace** — Load custom Typst templates at runtime
-- **HTML/PNG export** — Beyond PDF
+- **Multi-format export** — HTML, PNG, DOCX beyond PDF
 - **Streaming compilation** — For very large documents
 - **WASM build** — Run in browser environments
+- **Template customization** — User-selectable themes, colors, fonts
 
 ## Development
 

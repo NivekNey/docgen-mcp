@@ -1,8 +1,12 @@
+use crate::documents::cover_letter::CoverLetter;
 use crate::documents::resume::Resume;
 use serde_json;
 
-/// The raw Typst template content
+/// The raw Typst template content for resumes
 const RESUME_TEMPLATE: &str = include_str!("../../templates/resume.typ");
+
+/// The raw Typst template content for cover letters
+const COVER_LETTER_TEMPLATE: &str = include_str!("../../templates/cover_letter.typ");
 
 /// Transforms a Resume struct into a Typst source string
 pub fn transform_resume(resume: &Resume) -> Result<String, serde_json::Error> {
@@ -34,6 +38,30 @@ pub fn transform_resume(resume: &Resume) -> Result<String, serde_json::Error> {
 #resume(json-data)
 "#,
         template = RESUME_TEMPLATE,
+        json = json_data
+    );
+
+    Ok(source)
+}
+
+/// Transforms a CoverLetter struct into a Typst source string
+pub fn transform_cover_letter(cover_letter: &CoverLetter) -> Result<String, serde_json::Error> {
+    // Serialize the cover letter data to JSON
+    let json_data = serde_json::to_string(cover_letter)?;
+
+    // Construct the full Typst source
+    let source = format!(
+        r#"{template}
+
+#let json-string = `````
+{json}
+`````.text
+
+#let json-data = json.decode(json-string)
+
+#cover_letter(json-data)
+"#,
+        template = COVER_LETTER_TEMPLATE,
         json = json_data
     );
 
