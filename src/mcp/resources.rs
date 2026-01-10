@@ -66,9 +66,11 @@ mod tests {
     #[test]
     fn test_list_resources() {
         let resources = list_resources();
-        assert_eq!(resources.len(), 1);
+        assert_eq!(resources.len(), 2);
         assert_eq!(resources[0].raw.uri, RESUME_SCHEMA_URI);
         assert_eq!(resources[0].raw.name, "Resume Schema");
+        assert_eq!(resources[1].raw.uri, COVER_LETTER_SCHEMA_URI);
+        assert_eq!(resources[1].raw.name, "Cover Letter Schema");
     }
 
     #[test]

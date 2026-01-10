@@ -135,9 +135,13 @@ mod tests {
     #[test]
     fn test_list_prompts() {
         let prompts = list_prompts();
-        assert_eq!(prompts.len(), 1);
+        assert_eq!(prompts.len(), 3);
         assert_eq!(prompts[0].name, RESUME_BEST_PRACTICES_PROMPT);
+        assert_eq!(prompts[1].name, COVER_LETTER_BEST_PRACTICES_PROMPT);
+        assert_eq!(prompts[2].name, DOCUMENT_TYPE_GUIDE_PROMPT);
         assert!(prompts[0].description.is_some());
+        assert!(prompts[1].description.is_some());
+        assert!(prompts[2].description.is_some());
     }
 
     #[test]

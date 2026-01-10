@@ -1006,11 +1006,20 @@ mod tests {
     #[test]
     fn test_list_tools() {
         let tools = list_tools();
-        assert_eq!(tools.len(), 4);
-        assert_eq!(tools[0].name, GET_RESUME_SCHEMA_TOOL);
-        assert_eq!(tools[1].name, GET_RESUME_BEST_PRACTICES_TOOL);
-        assert_eq!(tools[2].name, VALIDATE_RESUME_TOOL);
-        assert_eq!(tools[3].name, GENERATE_RESUME_TOOL);
+        assert_eq!(tools.len(), 10);
+        // Document type discovery tools
+        assert_eq!(tools[0].name, GET_DOCUMENT_TYPES_TOOL);
+        assert_eq!(tools[1].name, GET_DOCUMENT_TYPE_GUIDE_TOOL);
+        // Resume tools
+        assert_eq!(tools[2].name, GET_RESUME_SCHEMA_TOOL);
+        assert_eq!(tools[3].name, GET_RESUME_BEST_PRACTICES_TOOL);
+        assert_eq!(tools[4].name, VALIDATE_RESUME_TOOL);
+        assert_eq!(tools[5].name, GENERATE_RESUME_TOOL);
+        // Cover letter tools
+        assert_eq!(tools[6].name, GET_COVER_LETTER_SCHEMA_TOOL);
+        assert_eq!(tools[7].name, GET_COVER_LETTER_BEST_PRACTICES_TOOL);
+        assert_eq!(tools[8].name, VALIDATE_COVER_LETTER_TOOL);
+        assert_eq!(tools[9].name, GENERATE_COVER_LETTER_TOOL);
     }
 
     #[test]
